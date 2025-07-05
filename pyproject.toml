@@ -5,10 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "David Gasquez", email = "davidgasquez@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = []
-
-[project.scripts]
-arbitron = "arbitron:main"
+dependencies = ["pydantic-ai>=0.3.6"]
 
 [build-system]
 requires = ["uv_build>=0.7.18,<0.8"]
