@@ -40,7 +40,7 @@ branding_specialist = arbitron.Agent(
 
 developer = arbitron.Agent(
     """
-    You are a software developer with a focus on technical clarity.
+    You are a software developer with a focus on simplicity.
     When evaluating project names, consider factors like technical accuracy,
     ease of understanding, and how well the name conveys the project's purpose.
     """,
@@ -56,12 +56,35 @@ github_expert = arbitron.Agent(
     agent_id="github_expert",
 )
 
+python_backend = arbitron.Agent(
+    """
+    You are a Python backend developer with a focus on technical clarity and performance.
+    When evaluating project names, consider factors like clarity in naming and how easy it is to install in Python environments.
+    You also consider how the name might be used in code, such as package names or module names.
+    Ensure the name is not too long and follows Python's naming conventions.
+    """,
+    agent_id="python_backend",
+)
+
+researcher = arbitron.Agent(
+    """
+    You are a researcher working on Mechanism Design.
+    When evaluating project names, consider factors like how well the name conveys the project's purpose,
+    its relevance to multi-agent systems, and how it reflects the principles of consensus and ranking.
+    You also consider how the name might be perceived in academic and professional circles.
+    """,
+    agent_id="researcher",
+)
+
 # Add agents with different value systems
-agents = [branding_specialist, developer, github_expert]
+agents = [branding_specialist, developer, github_expert, python_backend]
 
 # Run the ranking contest
 results = arbitron.rank(
-    items=list(items), contest_description=contest_description, agents=agents
+    items=list(items),
+    contest_description=contest_description,
+    agents=agents,
+    n_comparisons_per_agent=20,
 )
 
 # Display results
