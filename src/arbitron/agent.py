@@ -1,6 +1,9 @@
 """Agent wrapper for PydanticAI agents."""
 
 import logging
+import threading
+import time
+from collections import deque
 
 from pydantic_ai import Agent as PydanticAgent
 
@@ -28,6 +31,12 @@ class Agent:
         self.system_prompt = system_prompt
         self.agent_id = agent_id or f"agent_{id(self)}"
 
+        # Rate limiting: 15 requests per minute
+        self._rate_limit = 15
+        self._rate_window = 60  # seconds
+        self._request_times = deque()
+        self._rate_lock = threading.Lock()
+
         # Create the PydanticAI agent with structured output
         self._agent = PydanticAgent(
             model=model,
@@ -51,6 +60,32 @@ Your specific evaluation criteria:
 """
         return base_prompt + self.system_prompt
 
+    def _wait_for_rate_limit(self) -> None:
+        """Wait if necessary to respect rate limits."""
+        with self._rate_lock:
+            current_time = time.time()
+
+            # Remove old requests outside the time window
+            while (
+                self._request_times
+                and current_time - self._request_times[0] > self._rate_window
+            ):
+                self._request_times.popleft()
+
+            # Always wait at least 4 seconds between requests (15 requests/60 seconds = 1 request per 4 seconds)
+            if self._request_times:
+                time_since_last = current_time - self._request_times[-1]
+                min_interval = self._rate_window / self._rate_limit
+                if time_since_last < min_interval:
+                    wait_time = min_interval - time_since_last
+                    logger.debug(
+                        f"Waiting {wait_time:.2f} seconds to maintain rate limit"
+                    )
+                    time.sleep(wait_time)
+
+            # Record this request
+            self._request_times.append(time.time())
+
     def compare(
         self, item_a: Item, item_b: Item, contest_description: str
     ) -> ComparisonResult:
@@ -64,6 +99,9 @@ Your specific evaluation criteria:
         Returns:
             ComparisonResult with the agent's choice and reasoning
         """
+        # Apply rate limiting
+        self._wait_for_rate_limit()
+
         prompt = f"""Contest: {contest_description}
 
 Please compare these two options:
@@ -77,9 +115,11 @@ Option B: {item_b.name}
 Choose which option is better according to your evaluation criteria. You must set:
 - item_a: "{item_a.name}"
 - item_b: "{item_b.name}"
-- winner: either "{item_a.name}" or "{item_b.name}"
+- winner: EXACTLY "{item_a.name}" OR EXACTLY "{item_b.name}" (copy the exact spelling)
 - reasoning: your explanation
 - agent_id: "{self.agent_id}"
+
+CRITICAL: The winner field must be an exact character-for-character match of one of the two option names above. Do not modify, rephrase, or add any characters.
 """
 
         logger.debug(f"Agent {self.agent_id} comparing {item_a.name} vs {item_b.name}")
