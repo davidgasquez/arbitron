@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Item(BaseModel):
@@ -32,6 +32,33 @@ class ComparisonResult(BaseModel):
     agent_id: str = Field(
         ..., description="Identifier of the agent making the decision"
     )
+
+    @model_validator(mode="after")
+    def validate_winner(self) -> "ComparisonResult":
+        """Ensure winner is exactly one of the two items being compared."""
+        if self.winner not in [self.item_a, self.item_b]:
+            # Try to find the closest match
+            import difflib
+            
+            possible_matches = [self.item_a, self.item_b]
+            closest_match = difflib.get_close_matches(
+                self.winner, possible_matches, n=1, cutoff=0.6
+            )
+            
+            if closest_match:
+                corrected_winner = closest_match[0]
+                import logging
+                logging.warning(
+                    f"Winner '{self.winner}' corrected to '{corrected_winner}' "
+                    f"(closest match from [{self.item_a}, {self.item_b}])"
+                )
+                self.winner = corrected_winner
+            else:
+                raise ValueError(
+                    f"Winner '{self.winner}' must be exactly one of: "
+                    f"'{self.item_a}' or '{self.item_b}'"
+                )
+        return self
 
 
 class RankingResult(BaseModel):
