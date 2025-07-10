@@ -2,6 +2,10 @@
 
 A multi-agent consensus ranking system to derive optimal weights through pairwise comparisons. Arbitron uses multiple agents, each one configured with unique values, to perform pairwise evaluations across any arbitrary set of items. Using multiple ranking algorithms, it synthesizes these diverse judgments into robust, bias-resistant rankings.
 
+### Why not a proper council and let the agents talk?
+
+Needs to be done with the entire list and that requires a global view. Easy for agents to ignore one element and mess things up. Adding a new dependencies requires rerunning everything.
+
 ## 🌟 Features
 
 - 🤖 Deploy multiple AI agents with customizable value systems.

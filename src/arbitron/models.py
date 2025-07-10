@@ -39,15 +39,16 @@ class ComparisonResult(BaseModel):
         if self.winner not in [self.item_a, self.item_b]:
             # Try to find the closest match
             import difflib
-            
+
             possible_matches = [self.item_a, self.item_b]
             closest_match = difflib.get_close_matches(
                 self.winner, possible_matches, n=1, cutoff=0.6
             )
-            
+
             if closest_match:
                 corrected_winner = closest_match[0]
                 import logging
+
                 logging.warning(
                     f"Winner '{self.winner}' corrected to '{corrected_winner}' "
                     f"(closest match from [{self.item_a}, {self.item_b}])"
