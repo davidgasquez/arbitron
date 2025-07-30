@@ -1,3 +1,5 @@
+from pydantic_ai.models.huggingface import HuggingFaceModel
+
 import arbitron
 
 # Enable logging to see what's happening
@@ -17,6 +19,7 @@ items: list[str] = [
     "Arbitron",
     "Dependex",
     "Impactify",
+    "Cofee",
     "Impetus",
     "Aestimator",
     "Ranksmith",
@@ -29,15 +32,6 @@ contest_description = """
     The name should be one word, simple, and convey a sense of agentic AI.
 """
 
-branding_specialist = arbitron.Agent(
-    """
-    You are a branding expert focused on creating impactful names.
-    When evaluating project names, consider factors like memorability,
-    relevance, simplicity, and the emotions they evoke.
-    """,
-    agent_id="branding_specialist",
-)
-
 developer = arbitron.Agent(
     """
     You are a software developer with a focus on simplicity.
@@ -45,6 +39,7 @@ developer = arbitron.Agent(
     ease of understanding, and how well the name conveys the project's purpose.
     """,
     agent_id="developer",
+    model="openai:gpt-4.1-nano",
 )
 
 github_expert = arbitron.Agent(
@@ -54,6 +49,7 @@ github_expert = arbitron.Agent(
     searchability, and how well the name aligns with GitHub's conventions.
     """,
     agent_id="github_expert",
+    model="google-gla:gemini-2.5-flash-lite",
 )
 
 python_backend = arbitron.Agent(
@@ -64,7 +60,9 @@ python_backend = arbitron.Agent(
     Ensure the name is not too long and follows Python's naming conventions.
     """,
     agent_id="python_backend",
+    model="groq:meta-llama/llama-4-scout-17b-16e-instruct",
 )
+
 
 researcher = arbitron.Agent(
     """
@@ -74,10 +72,16 @@ researcher = arbitron.Agent(
     You also consider how the name might be perceived in academic and professional circles.
     """,
     agent_id="researcher",
+    model=HuggingFaceModel("Qwen/Qwen2.5-72B-Instruct"),  # type: ignore
 )
 
 # Add agents with different value systems
-agents = [branding_specialist, developer, github_expert, python_backend]
+agents = [
+    developer,
+    github_expert,
+    python_backend,
+    researcher,
+]
 
 # Run the ranking contest
 results = arbitron.rank(
@@ -85,6 +89,7 @@ results = arbitron.rank(
     contest_description=contest_description,
     agents=agents,
     n_comparisons_per_agent=20,
+    output_file="naming_competition.csv",
 )
 
 # Display results

@@ -116,10 +116,10 @@ Choose which option is better according to your evaluation criteria. You must se
 - item_a: "{item_a.name}"
 - item_b: "{item_b.name}"
 - winner: EXACTLY "{item_a.name}" OR EXACTLY "{item_b.name}" (copy the exact spelling)
-- reasoning: your explanation
+- reasoning: Your explanation in ONE SHORT sentence.
 - agent_id: "{self.agent_id}"
 
-CRITICAL: The winner field must be an exact character-for-character match of one of the two option names above. Do not modify, rephrase, or add any characters.
+CRITICAL: The winner field must be an exact character-for-character match of one of the two option names above. Do not modify, rephrase, or add any characters. You MUST call the tool to select the winner.
 """
 
         logger.debug(f"Agent {self.agent_id} comparing {item_a.name} vs {item_b.name}")

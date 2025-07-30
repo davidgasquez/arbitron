@@ -1,7 +1,11 @@
 """Main contest orchestration logic."""
 
+import csv
 import logging
+import os
 import random
+import uuid
+from datetime import datetime
 from typing import List, Optional, Union
 
 from .agent import Agent
@@ -18,6 +22,7 @@ def rank(
     competition_name: Optional[str] = None,
     n_comparisons_per_agent: int = 10,
     random_seed: Optional[int] = None,
+    output_file: Optional[str] = None,
 ) -> RankingResult:
     """Run a ranking contest with multiple agents.
 
@@ -28,6 +33,7 @@ def rank(
         competition_name: Optional name for the competition
         n_comparisons_per_agent: Number of random pairwise comparisons per agent
         random_seed: Optional seed for reproducible random sampling
+        output_file: Optional CSV file path to save comparisons as they happen
 
     Returns:
         RankingResult with final rankings, scores, and all comparisons
@@ -35,6 +41,23 @@ def rank(
     # Set random seed if provided
     if random_seed is not None:
         random.seed(random_seed)
+
+    # Generate run_id
+    run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+
+    # Set up CSV writer if output file is specified
+    csv_writer = None
+    csv_file = None
+    if output_file:
+        file_exists = os.path.exists(output_file)
+        csv_file = open(output_file, 'a', newline='', encoding='utf-8')
+        csv_writer = csv.DictWriter(csv_file, fieldnames=[
+            'run_id', 'timestamp', 'agent_id',
+            'item_a', 'item_b', 'winner', 'reasoning'
+        ])
+        if not file_exists:
+            csv_writer.writeheader()
+        logger.info(f"Writing comparisons to {output_file}")
 
     # Convert strings to Item objects if needed
     item_objects = []
@@ -67,21 +90,43 @@ def rank(
     # Collect all comparisons
     all_comparisons = []
 
-    for agent in agents:
-        # Sample random pairs for this agent
-        n_samples = min(n_comparisons_per_agent, len(all_pairs))
-        sampled_pairs = random.sample(all_pairs, n_samples)
+    try:
+        # Randomize agent order
+        shuffled_agents = agents.copy()
+        random.shuffle(shuffled_agents)
+        
+        for agent in shuffled_agents:
+            # Sample random pairs for this agent
+            n_samples = min(n_comparisons_per_agent, len(all_pairs))
+            sampled_pairs = random.sample(all_pairs, n_samples)
 
-        logger.info(f"Agent {agent.agent_id} will perform {n_samples} comparisons")
+            logger.info(f"Agent {agent.agent_id} will perform {n_samples} comparisons")
 
-        # Perform comparisons
-        for item_a, item_b in sampled_pairs:
-            # Randomly swap order to avoid position bias
-            if random.random() < 0.5:
-                item_a, item_b = item_b, item_a
+            # Perform comparisons
+            for item_a, item_b in sampled_pairs:
+                # Randomly swap order to avoid position bias
+                if random.random() < 0.5:
+                    item_a, item_b = item_b, item_a
 
-            comparison = agent.compare(item_a, item_b, contest_description)
-            all_comparisons.append(comparison)
+                comparison = agent.compare(item_a, item_b, contest_description)
+                all_comparisons.append(comparison)
+
+                # Write to CSV immediately if output file is specified
+                if csv_writer:
+                    csv_writer.writerow({
+                        'run_id': run_id,
+                        'timestamp': comparison.timestamp.isoformat(),
+                        'agent_id': comparison.agent_id,
+                        'item_a': comparison.item_a,
+                        'item_b': comparison.item_b,
+                        'winner': comparison.winner,
+                        'reasoning': comparison.reasoning
+                    })
+                    csv_file.flush()  # Ensure it's written immediately
+    finally:
+        # Close CSV file if it was opened
+        if csv_file:
+            csv_file.close()
 
     logger.info(f"Collected {len(all_comparisons)} total comparisons")
 

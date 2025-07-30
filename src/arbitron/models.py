@@ -1,5 +1,6 @@
 """Pydantic models for Arbitron."""
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -31,6 +32,9 @@ class ComparisonResult(BaseModel):
     reasoning: str = Field(..., description="Agent's reasoning for the choice")
     agent_id: str = Field(
         ..., description="Identifier of the agent making the decision"
+    )
+    timestamp: datetime = Field(
+        default_factory=datetime.utcnow, description="When the comparison was made"
     )
 
     @model_validator(mode="after")

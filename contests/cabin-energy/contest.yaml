@@ -1,0 +1,7 @@
+name: "Norwegian Cabin Energy Source"
+description: |
+  Choose the best energy source for a remote cabin in the Norwegian woods.
+  Consider the harsh winters, limited grid access, maintenance requirements,
+  initial costs, environmental impact, and reliability in extreme weather.
+  The cabin needs year-round power for heating, lighting, and basic appliances.
+comparisons_per_agent: 20
