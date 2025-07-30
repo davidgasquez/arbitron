@@ -2,7 +2,6 @@
 
 import logging
 import math
-from typing import Dict, List
 
 from .models import ComparisonResult
 
@@ -10,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_bradley_terry_scores(
-    comparisons: List[ComparisonResult], items: List[str]
-) -> Dict[str, float]:
+    comparisons: list[ComparisonResult], items: list[str]
+) -> dict[str, float]:
     """Calculate Bradley-Terry scores from pairwise comparisons.
 
     The Bradley-Terry model estimates the "strength" of each item based on
@@ -105,7 +104,7 @@ def calculate_bradley_terry_scores(
     return scores
 
 
-def rank_items(scores: Dict[str, float]) -> List[str]:
+def rank_items(scores: dict[str, float]) -> list[str]:
     """Convert scores to a ranked list of items.
 
     Args:

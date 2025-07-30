@@ -1,5 +1,3 @@
-from pydantic_ai.models.huggingface import HuggingFaceModel
-
 import arbitron
 
 # Enable logging to see what's happening
@@ -60,19 +58,7 @@ python_backend = arbitron.Agent(
     Ensure the name is not too long and follows Python's naming conventions.
     """,
     agent_id="python_backend",
-    model="groq:meta-llama/llama-4-scout-17b-16e-instruct",
-)
-
-
-researcher = arbitron.Agent(
-    """
-    You are a researcher working on Mechanism Design.
-    When evaluating project names, consider factors like how well the name conveys the project's purpose,
-    its relevance to multi-agent systems, and how it reflects the principles of consensus and ranking.
-    You also consider how the name might be perceived in academic and professional circles.
-    """,
-    agent_id="researcher",
-    model=HuggingFaceModel("Qwen/Qwen2.5-72B-Instruct"),  # type: ignore
+    model="groq:moonshotai/kimi-k2-instruct",
 )
 
 # Add agents with different value systems
@@ -80,7 +66,6 @@ agents = [
     developer,
     github_expert,
     python_backend,
-    researcher,
 ]
 
 # Run the ranking contest
@@ -89,7 +74,7 @@ results = arbitron.rank(
     contest_description=contest_description,
     agents=agents,
     n_comparisons_per_agent=20,
-    output_file="naming_competition.csv",
+    output_file="new_naming_competition.csv",
 )
 
 # Display results

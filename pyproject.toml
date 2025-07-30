@@ -1,14 +1,11 @@
 [project]
 name = "arbitron"
 version = "0.1.0"
-description = "Add your description here"
+description = "A multi-agent consensus ranking system to derive optimal weights through pairwise comparisons. Arbitron uses multiple agents, each one configured with unique values, to perform pairwise evaluations across any arbitrary set of items. Using multiple ranking algorithms, it synthesizes these diverse judgments into robust, bias-resistant rankings."
 readme = "README.md"
 authors = [{ name = "David Gasquez", email = "davidgasquez@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = [
-    "pydantic-ai>=0.3.6",
-    "pydantic-ai-slim[huggingface]>=0.3.6",
-]
+dependencies = ["networkx>=3.5", "pydantic-ai>=0.3.6"]
 
 [build-system]
 requires = ["uv_build>=0.7.18,<0.8"]

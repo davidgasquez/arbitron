@@ -16,6 +16,3 @@ __all__ = [
     "RankingResult",
     "setup_logging",
 ]
-
-# Setup default logging
-setup_logging()

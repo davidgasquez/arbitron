@@ -6,7 +6,7 @@ import os
 import random
 import uuid
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import Union
 
 from .agent import Agent
 from .models import Competition, Item, RankingResult
@@ -16,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 def rank(
-    items: List[Union[str, Item]],
+    items: list[Union[str, Item]],
     contest_description: str,
-    agents: List[Agent],
-    competition_name: Optional[str] = None,
+    agents: list[Agent],
+    competition_name: str | None = None,
     n_comparisons_per_agent: int = 10,
-    random_seed: Optional[int] = None,
-    output_file: Optional[str] = None,
+    random_seed: int | None = None,
+    output_file: str | None = None,
 ) -> RankingResult:
     """Run a ranking contest with multiple agents.
 
@@ -45,27 +45,10 @@ def rank(
     # Generate run_id
     run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
-    # Set up CSV writer if output file is specified
-    csv_writer = None
-    csv_file = None
-    if output_file:
-        file_exists = os.path.exists(output_file)
-        csv_file = open(output_file, 'a', newline='', encoding='utf-8')
-        csv_writer = csv.DictWriter(csv_file, fieldnames=[
-            'run_id', 'timestamp', 'agent_id',
-            'item_a', 'item_b', 'winner', 'reasoning'
-        ])
-        if not file_exists:
-            csv_writer.writeheader()
-        logger.info(f"Writing comparisons to {output_file}")
-
     # Convert strings to Item objects if needed
-    item_objects = []
-    for item in items:
-        if isinstance(item, str):
-            item_objects.append(Item(name=item))  # type: ignore
-        else:
-            item_objects.append(item)
+    item_objects = [
+        Item(name=item) if isinstance(item, str) else item for item in items
+    ]
 
     # Create Competition object
     competition = Competition(
@@ -87,46 +70,65 @@ def rank(
 
     logger.debug(f"Total possible pairs: {len(all_pairs)}")
 
+    # Setup CSV file if output_file is specified
+    csv_file = None
+    csv_writer = None
+    if output_file:
+        logger.info(f"Writing comparisons to {output_file}")
+        csv_fieldnames = [
+            "run_id",
+            "timestamp",
+            "agent_id",
+            "item_a",
+            "item_b",
+            "winner",
+            "reasoning",
+        ]
+        file_exists = os.path.exists(output_file)
+        csv_file = open(output_file, "a", newline="", encoding="utf-8")
+        csv_writer = csv.DictWriter(csv_file, fieldnames=csv_fieldnames)
+        if not file_exists:
+            csv_writer.writeheader()
+
     # Collect all comparisons
     all_comparisons = []
 
-    try:
-        # Randomize agent order
-        shuffled_agents = agents.copy()
-        random.shuffle(shuffled_agents)
-        
-        for agent in shuffled_agents:
-            # Sample random pairs for this agent
-            n_samples = min(n_comparisons_per_agent, len(all_pairs))
-            sampled_pairs = random.sample(all_pairs, n_samples)
+    # Randomize agent order
+    shuffled_agents = agents.copy()
+    random.shuffle(shuffled_agents)
 
-            logger.info(f"Agent {agent.agent_id} will perform {n_samples} comparisons")
+    for agent in shuffled_agents:
+        # Sample random pairs for this agent
+        n_samples = min(n_comparisons_per_agent, len(all_pairs))
+        sampled_pairs = random.sample(all_pairs, n_samples)
 
-            # Perform comparisons
-            for item_a, item_b in sampled_pairs:
-                # Randomly swap order to avoid position bias
-                if random.random() < 0.5:
-                    item_a, item_b = item_b, item_a
+        logger.info(f"Agent {agent.agent_id} will perform {n_samples} comparisons")
 
-                comparison = agent.compare(item_a, item_b, contest_description)
-                all_comparisons.append(comparison)
+        # Perform comparisons
+        for item_a, item_b in sampled_pairs:
+            # Randomly swap order to avoid position bias
+            if random.random() < 0.5:
+                item_a, item_b = item_b, item_a
 
-                # Write to CSV immediately if output file is specified
-                if csv_writer:
-                    csv_writer.writerow({
-                        'run_id': run_id,
-                        'timestamp': comparison.timestamp.isoformat(),
-                        'agent_id': comparison.agent_id,
-                        'item_a': comparison.item_a,
-                        'item_b': comparison.item_b,
-                        'winner': comparison.winner,
-                        'reasoning': comparison.reasoning
-                    })
-                    csv_file.flush()  # Ensure it's written immediately
-    finally:
-        # Close CSV file if it was opened
-        if csv_file:
-            csv_file.close()
+            comparison = agent.compare(item_a, item_b, contest_description)
+            all_comparisons.append(comparison)
+
+            # Write comparison immediately if CSV output is enabled
+            if csv_writer and csv_file:
+                csv_writer.writerow({
+                    "run_id": run_id,
+                    "timestamp": comparison.timestamp.isoformat(),
+                    "agent_id": comparison.agent_id,
+                    "item_a": comparison.item_a,
+                    "item_b": comparison.item_b,
+                    "winner": comparison.winner,
+                    "reasoning": comparison.reasoning,
+                })
+                csv_file.flush()
+
+    # Close CSV file if it was opened
+    if csv_file:
+        csv_file.close()
 
     logger.info(f"Collected {len(all_comparisons)} total comparisons")
 
