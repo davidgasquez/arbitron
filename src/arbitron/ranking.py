@@ -1,117 +1,75 @@
-"""Bradley-Terry ranking implementation."""
+from typing import List, Tuple
 
-import logging
-import math
-from typing import Dict, List
+import choix
 
-from .models import ComparisonResult
-
-logger = logging.getLogger(__name__)
+from .models import Comparison
 
 
-def calculate_bradley_terry_scores(
-    comparisons: List[ComparisonResult], items: List[str]
-) -> Dict[str, float]:
-    """Calculate Bradley-Terry scores from pairwise comparisons.
-
-    The Bradley-Terry model estimates the "strength" of each item based on
-    win/loss records. Higher scores indicate stronger items.
-
-    Args:
-        comparisons: List of pairwise comparison results
-        items: List of all item names
-
-    Returns:
-        Dictionary mapping item names to Bradley-Terry scores
+def rank(
+    comparisons: List[Comparison], *, alpha: float = 0.001, max_iter: int = 1000
+) -> List[Tuple[str, float]]:
     """
-    # Initialize win matrix
-    n = len(items)
-    item_to_idx = {item: i for i, item in enumerate(items)}
+    Estimate Bradley-Terry scores for every item that appears in the
+    supplied `comparisons` list and return a descending ranking.
 
-    # Create win matrix as list of lists
-    win_matrix = [[0.0 for _ in range(n)] for _ in range(n)]
+    Parameters
+    ----------
+    comparisons : list[Comparison]
+        All pairwise judgements that have been produced so far.
+    alpha : float, default 0.001
+        Damping factor passed straight to `choix.ilsr_pairwise`.
+    max_iter : int, default 1000
+        Maximum number of ILSR iterations.
 
-    # Count wins for each pair
-    for comp in comparisons:
-        if comp.winner == comp.item_a:
-            winner_idx = item_to_idx[comp.item_a]
-            loser_idx = item_to_idx[comp.item_b]
+    Returns
+    -------
+    list[tuple[item_id, score]]
+        A list of (item_id, estimated_skill) tuples sorted from the
+        strongest item to the weakest. The return type is plain
+        Python - no pydantic or custom classes - so it is easy to print,
+        serialise or post-process.
+    """
+    if not comparisons:
+        return []
+
+    # Collect all unique item ids
+    item_ids: set[str] = {cmp.item_a for cmp in comparisons} | {
+        cmp.item_b for cmp in comparisons
+    }
+
+    if len(item_ids) < 2:
+        # Need at least 2 items for ranking
+        return [(list(item_ids)[0], 0.0)] if item_ids else []
+
+    # Build stable index mapping for choix
+    id_to_idx = {item_id: i for i, item_id in enumerate(sorted(item_ids))}
+
+    # Convert each Comparison into (winner_idx, loser_idx) tuple
+    data: List[Tuple[int, int]] = []
+    for cmp in comparisons:
+        w_id = cmp.winner
+        # Winner must be one of the two items
+        if w_id == cmp.item_a:
+            l_id = cmp.item_b
+        elif w_id == cmp.item_b:
+            l_id = cmp.item_a
         else:
-            winner_idx = item_to_idx[comp.item_b]
-            loser_idx = item_to_idx[comp.item_a]
+            raise ValueError(
+                f"Winner {w_id!r} is not part of the compared pair "
+                f"({cmp.item_a!r}, {cmp.item_b!r})."
+            )
+        data.append((id_to_idx[w_id], id_to_idx[l_id]))
 
-        win_matrix[winner_idx][loser_idx] += 1
+    # Feed the data to choix
+    scores = choix.ilsr_pairwise(
+        n_items=len(item_ids), data=data, alpha=alpha, max_iter=max_iter
+    )
 
-    # Calculate total games for each pair
-    total_games = [
-        [win_matrix[i][j] + win_matrix[j][i] for j in range(n)] for i in range(n)
-    ]
+    # Translate scores back to item ids and sort descending
+    ranking = sorted(
+        ((item_id, float(scores[idx])) for item_id, idx in id_to_idx.items()),
+        key=lambda t: t[1],
+        reverse=True,
+    )
 
-    # Initialize Bradley-Terry parameters (log-scale for stability)
-    log_strengths = [0.0 for _ in range(n)]
-
-    # Iterative algorithm to estimate strengths
-    max_iterations = 100
-    tolerance = 1e-6
-
-    for iteration in range(max_iterations):
-        old_log_strengths = log_strengths[:]
-
-        for i in range(n):
-            numerator = 0.0
-            denominator = 0.0
-
-            for j in range(n):
-                if i != j and total_games[i][j] > 0:
-                    # Number of wins for i against j
-                    wins_i = win_matrix[i][j]
-                    # Total games between i and j
-                    total_ij = total_games[i][j]
-
-                    # Bradley-Terry update
-                    strength_ratio = math.exp(
-                        old_log_strengths[i] - old_log_strengths[j]
-                    )
-                    numerator += wins_i
-                    denominator += total_ij * (strength_ratio / (1 + strength_ratio))
-
-            # Update log strength
-            if denominator > 0 and numerator > 0:
-                ratio = numerator / denominator
-                # Clamp ratio to avoid extreme values
-                ratio = max(1e-10, min(ratio, 1e10))
-                log_strengths[i] = math.log(ratio)
-            elif denominator > 0:
-                # Handle case where numerator is 0 (item never won)
-                log_strengths[i] = math.log(1e-10)  # Very small value instead of 0
-
-        # Normalize (set geometric mean to 1)
-        mean_log_strength = sum(log_strengths) / n
-        log_strengths = [ls - mean_log_strength for ls in log_strengths]
-
-        # Check convergence
-        max_diff = max(abs(log_strengths[i] - old_log_strengths[i]) for i in range(n))
-        if max_diff < tolerance:
-            logger.debug(f"Bradley-Terry converged in {iteration + 1} iterations")
-            break
-
-    # Convert to actual strengths
-    strengths = [math.exp(ls) for ls in log_strengths]
-
-    # Create result dictionary
-    scores = {items[i]: float(strengths[i]) for i in range(n)}
-
-    logger.info("Bradley-Terry scores calculated successfully")
-    return scores
-
-
-def rank_items(scores: Dict[str, float]) -> List[str]:
-    """Convert scores to a ranked list of items.
-
-    Args:
-        scores: Dictionary mapping item names to scores
-
-    Returns:
-        List of items in descending order of score
-    """
-    return sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
+    return ranking

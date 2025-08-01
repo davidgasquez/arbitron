@@ -1,0 +1,23 @@
+description: "Rank the movies based on their soundtrack quality."
+comparisons_per_agent: 20
+agents:
+  - id: "SciFi Purist"
+    prompt: "Compare based on scientific accuracy and hard sci-fi concepts."
+    model: "google-gla:gemini-2.5-flash-lite"
+  - id: "Nolan Fan"
+    prompt: "Compare based on complex narratives and emotional depth."
+    model: "openai:gpt-4.1-nano"
+  - id: "Critics Choice"
+    prompt: "Compare based on artistic merit and cinematic excellence."
+    model: "groq:moonshotai/kimi-k2-instruct"
+items:
+  - id: "arrival"
+  - id: "blade_runner"
+  - id: "interstellar"
+  - id: "inception"
+  - id: "the_dark_knight"
+  - id: "dune"
+  - id: "the_matrix"
+  - id: "2001_space_odyssey"
+  - id: "the_fifth_element"
+  - id: "the_martian"
