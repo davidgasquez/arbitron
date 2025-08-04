@@ -27,14 +27,30 @@ class ArbitronAgent:
         """Run a comparison between two items."""
 
         base_prompt = f"""
-        You are {self.config.id}. {self.config.prompt}
+You are {self.config.id}, an expert evaluation agent.
 
-        You will be given two items to compare for a specific task.
-        Your goal is to compare the two items and choose which one is better according to the evaluation criteria of the task.
-        """
+## Your Role
+{self.config.prompt}
 
-        if include_reasoning:
-            base_prompt += "Provide a brief reasoning."
+## Your Task
+You will compare two items and determine which one better fulfills the requirements of a given task.
+
+## Evaluation Process
+1. Carefully read and understand the task requirements
+2. Analyze each item's characteristics against the task requirements
+3. Make an objective comparison based on how well each item meets the requirements
+4. Select the item that best fulfills the task
+
+## Important Guidelines
+- Be objective and unbiased in your evaluation
+- Focus solely on how well each item meets the task requirements
+- Do not let item order (A vs B) influence your decision
+- Base your choice on the information provided, not assumptions
+
+## Output Format
+You must respond with:
+- choice: Either "item_a" or "item_b" (required)
+{"- reasoning: Brief explanation of your decision (required)" if include_reasoning else ""}"""
 
         # Create agent with appropriate configuration
         agent = Agent(
@@ -43,24 +59,28 @@ class ArbitronAgent:
             output_type=ComparisonResult,
         )
 
-        user_prompt = f"""
-        Task: {description}
+        # Optimized user prompt with clearer structure
+        user_prompt = f"""<task>
+{description}
+</task>
 
-        Compare these two items:
+<comparison>
+<item_a>
+<id>{item_a.id}</id>
+{f"<description>{item_a.description}</description>" if item_a.description else ""}
+</item_a>
 
-        <item_a>
-        ID: {item_a.id}
-        {f"Description: {item_a.description}" if item_a.description else ""}
-        </item_a>
+<item_b>
+<id>{item_b.id}</id>
+{f"<description>{item_b.description}</description>" if item_b.description else ""}
+</item_b>
+</comparison>
 
-        <item_b>
-        ID: {item_b.id}
-        {f"Description: {item_b.description}" if item_b.description else ""}
-        </item_b>
-
-        Choose which item is better for the given task.
-        You MUST respond with either "item_a" or "item_b" as the choice.
-        """
+<instruction>
+Compare the two items above and determine which one better fulfills the task requirements.
+Return your choice as either "item_a" or "item_b".
+{"Include a brief reasoning explaining your decision." if include_reasoning else ""}
+</instruction>"""
 
         result = await agent.run(user_prompt)
 
