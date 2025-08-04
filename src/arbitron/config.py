@@ -16,8 +16,18 @@ def load_competition(
 
     # Mandatory
     description: str = raw["description"]
-    agents = [Agent(**a) for a in raw["agents"]]
-    items = [Item(**i) for i in raw["items"]]
+    agents = [
+        Agent(
+            id=a["id"],
+            prompt=a["prompt"],
+            **{k: v for k, v in a.items() if k not in ["id", "prompt"]},
+        )
+        for a in raw["agents"]
+    ]
+    items = [
+        Item(id=i["id"], **{k: v for k, v in i.items() if k != "id"})
+        for i in raw["items"]
+    ]
 
     # Optional
     cpa = raw.get("comparisons_per_agent")  # may be None

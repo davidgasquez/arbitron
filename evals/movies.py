@@ -1,6 +1,6 @@
-from scoring import kendall_tau
-
 import arbitron
+
+from .scoring import kendall_tau
 
 movies = [
     arbitron.Item(id="Avatar"),

@@ -9,7 +9,13 @@ from .runner import run
 
 def cmd_run(args: argparse.Namespace) -> None:
     desc, agents, items, cpa, include_reasoning = load_competition(args.config)
-    comparisons = run(desc, agents, items, comparisons_per_agent=cpa, include_reasoning=include_reasoning)
+    comparisons = run(
+        desc,
+        agents,
+        items,
+        comparisons_per_agent=cpa,
+        include_reasoning=include_reasoning,
+    )
     output = args.output or Path("duels.csv")
     write_comparisons(output, comparisons)
     print(f"✅ {len(comparisons)} comparisons written to {output}")
