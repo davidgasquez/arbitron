@@ -1,8 +1,5 @@
 # Arbitron ⚖️
 
-> **par** /pär/ *n.* Spanish — a set of two
-> **vís** /viːs/ *adj.* Icelandic — wise, knowledgeable
-
 Arbitron is a multi-agent consensus ranking system that determines winners through pairwise comparisons. Instead of relying on individual ratings or single perspectives, multiple agents—each with unique value systems—evaluate items head-to-head to produce robust, fair rankings.
 
 **Why pairwise?** It's easier to compare two items than to assign absolute scores.
