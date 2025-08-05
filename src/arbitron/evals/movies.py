@@ -28,7 +28,7 @@ agents = [
     arbitron.Agent(
         id="Mei",
         prompt="You are a mathematician specialized in statistics and probability. Very rational and analytical.",
-        model="google-gla:gemini-2.5-flash",
+        model="anthropic:claude-sonnet-4-0",
     ),
 ]
 

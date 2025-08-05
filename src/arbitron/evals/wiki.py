@@ -18,47 +18,27 @@ agents = [
     arbitron.Agent(
         id="Will",
         prompt="You are a Wikipedian with a broad knowledge base.",
-        model="openai:gpt-4.1",
+        model="openai:gpt-4.1-nano",
     ),
     arbitron.Agent(
         id="Hanna",
         prompt="You are an engineer with deep knowledge about many topics.",
-        model="google-gla:gemini-2.5-pro",
+        model="google-gla:gemini-2.5-flash",
     ),
     arbitron.Agent(
         id="Mei",
         prompt="You are a mathematician specialized in statistics and probability. Very rational and analytical.",
-        model="openai:o4-mini",
-    ),
-    arbitron.Agent(
-        id="Liam",
-        prompt="You are a historian with expertise in world history and cultural significance.",
-        model="google-gla:gemini-2.5-pro",
-    ),
-    arbitron.Agent(
-        id="Ava",
-        prompt="You are a cultural critic with a focus on media and popular culture.",
-        model="openai:gpt-4.1",
-    ),
-    arbitron.Agent(
-        id="Ben",
-        prompt="You are a data scientist with a focus on analyzing trends and patterns in large datasets.",
-        model="openai:gpt-4.1",
-    ),
-    arbitron.Agent(
-        id="Marta",
-        prompt="You are an avid reader with a deep understanding of literature and storytelling.",
-        model="google-gla:gemini-2.5-pro",
+        model="anthropic:claude-sonnet-4-0",
     ),
 ]
 
-description = "Choose which article is the most popular Wikipedia article. TOTAL cumulative views in the history. Think about the article's popularity. Consider the number of views, cultural impact, and historical relevance, not just recent trends."
+description = "Choose the MOST POPULAR (total cumulative views) Wikipedia article. Consider the cultural impact, and historical relevance, not just recent trends. Use your best judgment based on your knowledge and experience."
 
 comparisons = arbitron.run(description, agents, movies, concurrency=5)
 ranking = arbitron.rank(comparisons)
 
-# for i, (item_id, score) in enumerate(ranking, 1):
-#     print(f"{i}. {item_id}: {score:.3f}")
+for i, (item_id, score) in enumerate(ranking, 1):
+    print(f"{i}. {item_id}: {score:.3f}")
 
 real_ranking = [
     "United States Senate",
@@ -76,6 +56,6 @@ real_ranking = [
 # Extract arbitron ranking order
 arbitron_ranking = [item_id for item_id, score in ranking]
 
-
+# Calculate Kendall's Tau correlation coefficient
 tau = kendall_tau(arbitron_ranking, real_ranking)
 print(f"{tau:.3f}")

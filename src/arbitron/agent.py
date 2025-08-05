@@ -55,7 +55,7 @@ You must respond with:
             model=self.config.model,
             system_prompt=base_prompt,
             output_type=ComparisonResult,
-            retries=5,
+            retries=3,
         )
 
         # Optimized user prompt with clearer structure
