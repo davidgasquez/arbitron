@@ -38,14 +38,12 @@ You will compare two items and determine which one better fulfills the requireme
 ## Evaluation Process
 1. Carefully read and understand the task requirements
 2. Analyze each item's characteristics against the task requirements
-3. Make an objective comparison based on how well each item meets the requirements
-4. Select the item that best fulfills the task
+3. Think and make a choice based on how well each item meets the requirements
+4. Select the item that best fulfills the task requirements
 
 ## Important Guidelines
-- Be objective and unbiased in your evaluation
+- Try to be objective and unbiased in your evaluation
 - Focus solely on how well each item meets the task requirements
-- Do not let item order (A vs B) influence your decision
-- Base your choice on the information provided, not assumptions
 
 ## Output Format
 You must respond with:
@@ -57,6 +55,7 @@ You must respond with:
             model=self.config.model,
             system_prompt=base_prompt,
             output_type=ComparisonResult,
+            retries=5,
         )
 
         # Optimized user prompt with clearer structure
