@@ -1,6 +1,5 @@
 import arbitron
-
-from .scoring import kendall_tau
+from arbitron.evals.scoring import kendall_tau
 
 movies = [
     arbitron.Item(id="Avatar"),
@@ -17,23 +16,18 @@ movies = [
 
 agents = [
     arbitron.Agent(
-        id="Wikipedia Enthusiast",
-        prompt="You are an expert Wikipedian with a good graps of the community and articles.",
-        model="openai:gpt-4.1-nano",
+        id="Will",
+        prompt="You are a Wikipedian with a broad knowledge base.",
+        model="openai:gpt-4.1-mini",
     ),
     arbitron.Agent(
-        id="Random Person",
-        prompt="You are a person with general knowledge.",
-        model="openai:gpt-4o-mini",
+        id="Hanna",
+        prompt="You are an engineer with deep knowledge about many topics.",
+        model="google-gla:gemini-2.5-flash",
     ),
     arbitron.Agent(
-        id="Researcher",
-        prompt="You are a researcher with a deep knowledge of many topics. Very rational and analytical.",
-        model="openai:o4-mini",
-    ),
-    arbitron.Agent(
-        id="Researcher",
-        prompt="You are a researcher with a deep knowledge of many topics. Very rational and analytical.",
+        id="Mei",
+        prompt="You are a mathematician specialized in statistics and probability. Very rational and analytical.",
         model="google-gla:gemini-2.5-flash",
     ),
 ]
