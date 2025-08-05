@@ -104,12 +104,6 @@ This will create a file `duels.csv` with the results of the pairwise comparisons
 arbitron rank duels.csv
 ```
 
-## ❓ Why "Arbitron"?
-
-The name comes from the Old Icelandic word "val" meaning *choice* or *selection*. In Norse culture, having many choices among stories was a sign of abundance. Arbitron embodies this spirit—providing rich choice through diverse agent perspectives.
-
-Also inspired by Philip K. Dick's novel *VALIS* (*Vast Active Living Intelligence System*), reflecting the distributed, intelligent nature of multi-agent consensus.
-
 ## 🏛️ License
 
 MIT License - see [LICENSE](LICENSE) file for details.
