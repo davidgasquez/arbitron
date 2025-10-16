@@ -2,15 +2,12 @@ import arbitron
 
 movies = [
     arbitron.Item(id="arrival"),
-    arbitron.Item(id="blade_runner"),
     arbitron.Item(id="interstellar"),
     arbitron.Item(id="inception"),
     arbitron.Item(id="the_dark_knight"),
     arbitron.Item(id="dune"),
     arbitron.Item(id="the_matrix"),
     arbitron.Item(id="2001_space_odyssey"),
-    arbitron.Item(id="the_fifth_element"),
-    arbitron.Item(id="the_martian"),
 ]
 
 agents = [
@@ -33,6 +30,16 @@ agents = [
 
 description = "Rank the movies based on their soundtrack quality."
 
-comparisons = arbitron.run(description, agents, movies)
+comparisons = arbitron.run(
+    description, agents, movies, comparisons_per_agent=2, verbose=True
+)
 
-print(comparisons)
+wins = {movie.id: 0 for movie in movies}
+for comparison in comparisons:
+    wins[comparison.winner] = wins.get(comparison.winner, 0) + 1
+
+leaderboard = sorted(wins.items(), key=lambda entry: entry[1], reverse=True)
+
+print("Leaderboard (wins):")
+for rank, (item_id, count) in enumerate(leaderboard, start=1):
+    print(f"{rank}. {item_id}: {count}")
