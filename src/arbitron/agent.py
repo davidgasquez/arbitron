@@ -8,29 +8,13 @@ from .models import Agent as AgentConfig
 from .models import Comparison, Item
 
 
-class ComparisonResult(BaseModel):
-    choice: Literal["item_a", "item_b"]
-    reasoning: str | None = None
-
-
-class ArbitronAgent:
-    def __init__(self, config: AgentConfig):
-        self.config = config
-
-    async def compare(
-        self,
-        description: str,
-        item_a: Item,
-        item_b: Item,
-        include_reasoning: bool = False,
-    ) -> Comparison:
-        """Run a comparison between two items."""
-
-        base_prompt = f"""
-You are {self.config.id}, an expert evaluation agent.
+def _build_system_prompt(config: AgentConfig, include_reasoning: bool) -> str:
+    """Create the system prompt shown to the evaluation agent."""
+    return f"""
+You are {config.id}, an expert evaluation agent.
 
 ## Your Role
-{self.config.prompt}
+{config.prompt}
 
 ## Your Task
 You will compare two items and determine which one better fulfills the requirements of a given task.
@@ -50,29 +34,27 @@ You must respond with:
 - choice: Either "item_a" or "item_b" (required)
 {"- reasoning: Brief explanation of your decision (required)" if include_reasoning else ""}"""
 
-        # Create agent with appropriate configuration
-        agent = Agent(
-            model=self.config.model,
-            system_prompt=base_prompt,
-            output_type=ComparisonResult,
-            retries=3,
-        )
 
-        # Optimized user prompt with clearer structure
-        user_prompt = f"""<task>
+def _format_item_block(tag: str, item: Item) -> str:
+    """Return the XML-like block describing an item."""
+    description_line = (
+        f"<description>{item.description}</description>" if item.description else ""
+    )
+    return f"<{tag}>\n<id>{item.id}</id>\n{description_line}\n</{tag}>"
+
+
+def _build_user_prompt(
+    description: str, item_a: Item, item_b: Item, include_reasoning: bool
+) -> str:
+    """Create the user prompt delivered to the agent."""
+    return f"""<task>
 {description}
 </task>
 
 <comparison>
-<item_a>
-<id>{item_a.id}</id>
-{f"<description>{item_a.description}</description>" if item_a.description else ""}
-</item_a>
+{_format_item_block("item_a", item_a)}
 
-<item_b>
-<id>{item_b.id}</id>
-{f"<description>{item_b.description}</description>" if item_b.description else ""}
-</item_b>
+{_format_item_block("item_b", item_b)}
 </comparison>
 
 <instruction>
@@ -81,16 +63,51 @@ Return your choice as either "item_a" or "item_b".
 {"Include a brief reasoning explaining your decision." if include_reasoning else ""}
 </instruction>"""
 
+
+class ComparisonResult(BaseModel):
+    choice: Literal["item_a", "item_b"]
+    reasoning: str | None = None
+
+
+class ArbitronAgent:
+    def __init__(self, config: AgentConfig):
+        self.config = config
+
+    async def compare(
+        self,
+        description: str,
+        item_a: Item,
+        item_b: Item,
+        include_reasoning: bool = False,
+    ) -> Comparison:
+        """Run a comparison between two items."""
+
+        system_prompt = _build_system_prompt(self.config, include_reasoning)
+
+        # Create agent with appropriate configuration
+        agent = Agent(
+            model=self.config.model,
+            system_prompt=system_prompt,
+            output_type=ComparisonResult,
+            retries=3,
+        )
+
+        user_prompt = _build_user_prompt(description, item_a, item_b, include_reasoning)
+
         result = await agent.run(user_prompt)
 
-        winner_item = result.output.choice
-        winner = item_a.id if winner_item == "item_a" else item_b.id
+        output = result.output
+        assert isinstance(output, ComparisonResult), (
+            "Agent output must match ComparisonResult"
+        )
+
+        winner = {"item_a": item_a.id, "item_b": item_b.id}[output.choice]
 
         return Comparison(
             agent_id=self.config.id,
             item_a=item_a.id,
             item_b=item_b.id,
             winner=winner,
-            rationale=result.output.reasoning if include_reasoning else None,
+            rationale=output.reasoning if include_reasoning else None,
             created_at=datetime.now(timezone.utc),
         )
