@@ -60,7 +60,7 @@ description = "Rank the movies based on their soundtrack quality."
 
 comparisons = arbitron.run(description, agents, movies)
 
-print(comparisons)
+# Use choix or any other tool you like with the comparisons!
 ```
 
 ## 🏛️ License
