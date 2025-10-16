@@ -1,6 +1,6 @@
 # Arbitron ⚖️
 
-Arbitron is an agentic _pairwise_ comparison engine. Multiple agents, each with unique value systems, evaluate items head-to-head and produce a set of pairwise comparisons that can be used to derive item's ranks and weights.
+Arbitron is an agentic _pairwise_ comparison engine. Multiple agents, each with unique value systems, evaluate items head-to-head and produce a set of pairwise comparisons that can be used to [derive item's ranks and weights](https://choix.lum.li/en/latest/api.html#processing-pairwise-comparisons).
 
 - **Why pairwise?** It's easier to compare two items than to assign absolute scores.
 - **Why multi-agent?** Different models with different perspectives (system prompts) lead to more balanced, less biased outcomes.
