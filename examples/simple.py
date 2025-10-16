@@ -17,25 +17,22 @@ agents = [
     arbitron.Agent(
         id="SciFi Purist",
         prompt="Compare based on scientific accuracy and hard sci-fi concepts.",
-        model="google-gla:gemini-2.5-flash",
+        model="openai:gpt-5-nano",
     ),
     arbitron.Agent(
         id="Nolan Fan",
         prompt="Compare based on complex narratives and emotional depth.",
-        model="groq:qwen/qwen3-32b",
+        model="openai:gpt-5-nano",
     ),
     arbitron.Agent(
         id="Critics Choice",
         prompt="Compare based on artistic merit and cinematic excellence.",
-        model="openai:gpt-4.1-nano",
+        model="openai:gpt-5-nano",
     ),
 ]
 
 description = "Rank the movies based on their soundtrack quality."
 
 comparisons = arbitron.run(description, agents, movies)
-ranking = arbitron.rank(comparisons)
 
-print("Rankings (best to worst):")
-for i, (item_id, score) in enumerate(ranking, 1):
-    print(f"{i}. {item_id}: {score:.3f}")
+print(comparisons)
