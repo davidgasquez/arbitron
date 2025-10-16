@@ -7,7 +7,7 @@ from .models import Item
 
 def all_pairs(items: List[Item]) -> List[Tuple[Item, Item]]:
     """Generate all possible pairs from a list of items."""
-    return [(a, b) for a, b in itertools.combinations(items, 2)]
+    return list(itertools.combinations(items, 2))
 
 
 def sample_pairs(items: List[Item], k: int) -> List[Tuple[Item, Item]]:
