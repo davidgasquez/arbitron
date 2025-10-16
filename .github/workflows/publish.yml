@@ -26,6 +26,9 @@ jobs:
       - name: Install Python
         run: uv python install 3.13
 
+      - name: Sync project dependencies
+        run: uv sync --frozen
+
       - name: Lint
         run: make lint
 
