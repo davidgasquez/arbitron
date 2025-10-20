@@ -11,7 +11,7 @@ class Item(BaseModel):
 class Agent(BaseModel):
     id: str
     prompt: str
-    model: str = "openai:gpt-4.1-nano"
+    model: str = "openai:gpt-5-nano"
     max_calls_per_min: int = 60
     max_tokens: int | None = None
 

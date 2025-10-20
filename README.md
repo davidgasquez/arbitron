@@ -23,42 +23,48 @@ pip install arbitron
 Setup your favorite LLM provider's API keys in the environment (e.g: `OPENAI_API_KEY`) and then run the following code.
 
 ```python
-import arbitron
+from arbitron import Agent, Competition, Item
 
 movies = [
-    arbitron.Item(id="arrival"),
-    arbitron.Item(id="blade_runner"),
-    arbitron.Item(id="interstellar"),
-    arbitron.Item(id="inception"),
-    arbitron.Item(id="the_dark_knight"),
-    arbitron.Item(id="dune"),
-    arbitron.Item(id="the_matrix"),
-    arbitron.Item(id="2001_space_odyssey"),
-    arbitron.Item(id="the_fifth_element"),
-    arbitron.Item(id="the_martian"),
+    Item(id="arrival"),
+    Item(id="blade_runner"),
+    Item(id="interstellar"),
+    Item(id="inception"),
+    Item(id="the_dark_knight"),
+    Item(id="dune"),
+    Item(id="the_matrix"),
+    Item(id="2001_space_odyssey"),
+    Item(id="the_fifth_element"),
+    Item(id="the_martian"),
 ]
 
 agents = [
-    arbitron.Agent(
+    Agent(
         id="SciFi Purist",
         prompt="Compare based on scientific accuracy and hard sci-fi concepts.",
         model="openai:gpt-5-nano",
     ),
-    arbitron.Agent(
+    Agent(
         id="Nolan Fan",
         prompt="Compare based on complex narratives and emotional depth.",
         model="openai:gpt-5-nano",
     ),
-    arbitron.Agent(
+    Agent(
         id="Critics Choice",
         prompt="Compare based on artistic merit and cinematic excellence.",
         model="openai:gpt-5-nano",
     ),
 ]
 
-description = "Rank the movies based on their soundtrack quality."
+competition = Competition(
+    id="sci-fi-soundtracks",
+    description="Rank the movies based on their soundtrack quality.",
+    agents=agents,
+    items=movies,
+)
 
-comparisons = arbitron.run(description, agents, movies)
+comparisons = competition.run()
+competition.to_csv("comparisons.csv")
 
 # Use choix or any other tool you like with the comparisons!
 ```
