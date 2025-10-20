@@ -6,17 +6,16 @@ from typing import List
 
 from pydantic import BaseModel
 
-from .models import Agent as AgentConfig
-from .models import Comparison, Item
+from .models import Comparison, Item, Juror
 from .runner import run
 
 
 class Competition(BaseModel):
     id: str
     description: str
-    agents: List[AgentConfig]
+    jurors: List[Juror]
     items: List[Item]
-    comparisons_per_agent: int | None = None
+    comparisons_per_juror: int | None = None
     include_reasoning: bool = False
     concurrency: int = 4
     verbose: bool = False
@@ -26,9 +25,9 @@ class Competition(BaseModel):
         """Execute the competition and store the comparison results."""
         results = run(
             description=self.description,
-            agents=self.agents,
+            jurors=self.jurors,
             items=self.items,
-            comparisons_per_agent=self.comparisons_per_agent,
+            comparisons_per_juror=self.comparisons_per_juror,
             include_reasoning=self.include_reasoning,
             concurrency=self.concurrency,
             verbose=self.verbose,
@@ -44,7 +43,7 @@ class Competition(BaseModel):
         output_path = Path(path)
         fieldnames = [
             "competition_id",
-            "agent_id",
+            "juror_id",
             "item_a",
             "item_b",
             "winner",
@@ -59,7 +58,7 @@ class Competition(BaseModel):
                 writer.writerow(
                     {
                         "competition_id": self.id,
-                        "agent_id": comparison.agent_id,
+                        "juror_id": comparison.juror_id,
                         "item_a": comparison.item_a,
                         "item_b": comparison.item_b,
                         "winner": comparison.winner,

@@ -1,5 +1,5 @@
 from .competition import Competition
-from .models import Agent, Item
+from .models import ComparisonDecision, Item, Juror
 from .runner import run
 
-__all__ = ["Item", "Agent", "Competition", "run"]
+__all__ = ["Item", "Juror", "Competition", "ComparisonDecision", "run"]

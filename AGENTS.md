@@ -1,0 +1,5 @@
+- Use `uv run --env-file .env file.py` to run scripts
+- Keep things clean, simple, minimal, and Pythonic
+- Check linters often (`uvx ty check` and `uvx ruff check`)
+- Verify changes work by running code
+- Keep README up to date

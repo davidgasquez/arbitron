@@ -1,4 +1,6 @@
-from arbitron import Agent, Competition, Item
+from pydantic_ai import Agent as PydanticAgent
+
+from arbitron import ComparisonDecision, Competition, Item, Juror
 
 movies = [
     Item(id="arrival"),
@@ -13,28 +15,26 @@ movies = [
     Item(id="the_martian"),
 ]
 
-agents = [
-    Agent(
+jurors = [
+    Juror(
         id="SciFi Purist",
-        prompt="Compare based on scientific accuracy and hard sci-fi concepts.",
+        instructions="Compare based on scientific accuracy and hard sci-fi concepts.",
         model="openai:gpt-5-nano",
     ),
-    Agent(
-        id="Nolan Fan",
-        prompt="Compare based on complex narratives and emotional depth.",
-        model="openai:gpt-5-nano",
-    ),
-    Agent(
-        id="Critics Choice",
-        prompt="Compare based on artistic merit and cinematic excellence.",
-        model="openai:gpt-5-nano",
+    Juror(
+        id="Custom Composer",
+        agent=PydanticAgent(
+            model="openai:gpt-5-nano",
+            instructions="You are a film composer evaluating the emotional impact of each soundtrack.",
+            output_type=ComparisonDecision,
+        ),
     ),
 ]
 
 competition = Competition(
     id="sci-fi-soundtracks",
     description="Rank the movies based on their soundtrack quality.",
-    agents=agents,
+    jurors=jurors,
     items=movies,
 )
 
