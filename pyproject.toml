@@ -1,6 +1,6 @@
 [project]
 name = "arbitron"
-version = "0.5.1"
+version = "0.5.2"
 description = "Multi-agent collaboration through pairwise comparisons"
 readme = "README.md"
 authors = [{ name = "David Gasquez", email = "davidgasquez@gmail.com" }]
@@ -8,10 +8,8 @@ requires-python = ">=3.13"
 dependencies = ["pydantic-ai>=1.2.1"]
 
 [build-system]
-requires = ["uv_build>=0.9.3,<0.10.0"]
+requires = ["uv_build>=0.9.4,<0.10.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
-dev = [
-    "pytest>=8.4.2",
-]
+dev = ["pytest>=8.4.2"]
