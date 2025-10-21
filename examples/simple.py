@@ -1,10 +1,27 @@
+from pydantic import BaseModel
+
 from arbitron import Competition, Item, Juror
 
+
+class Movie(BaseModel):
+    title: str
+    year: int
+    composer: str
+
+
 items = [
-    Item(id="Arrival"),
-    Item(id="Interstellar"),
-    Item(id="Inception"),
-    Item(id="Lord of the Rings"),
+    Item(
+        id="arrival",
+        payload=Movie(title="Arrival", year=2016, composer="Johann Johannsson"),
+    ),
+    Item(
+        id="interstellar",
+        payload={"title": "Interstellar", "year": 2014, "composer": "Hans Zimmer"},
+    ),
+    Item(
+        id="inception",
+        payload=Movie(title="Inception", year=2010, composer="Hans Zimmer"),
+    ),
 ]
 
 jurors = [

@@ -1,10 +1,12 @@
 import itertools
 
 import pytest
+from pydantic import BaseModel
 from pydantic_ai import Agent, models
 from pydantic_ai.models.test import TestModel
 
 from arbitron import Competition, Item, Juror
+from arbitron.juror import _format_item_block
 from arbitron.models import ComparisonChoice
 from arbitron.pairing import RandomPairsSampler
 
@@ -46,6 +48,34 @@ def test_competition_runs_with_test_model():
     assert winners <= expected_ids
     assert all(comparison.created_at for comparison in comparisons)
     assert competition.comparisons == comparisons
+
+
+def test_item_payload_serialises_custom_data():
+    class Movie(BaseModel):
+        title: str
+        year: int
+
+    item = Item(id="arrival", payload=Movie(title="Arrival", year=2016))
+
+    assert item.prompt_payload() == {
+        "title": "Arrival",
+        "year": 2016,
+        "id": "arrival",
+    }
+
+
+def test_item_prompt_renders_payload_as_xml():
+    item = Item(
+        id="arrival",
+        payload={"title": "Arrival", "genres": ["scifi", "drama"]},
+    )
+
+    xml = _format_item_block("item_a", item)
+
+    assert "<item_a>" in xml
+    assert "<title>Arrival</title>" in xml
+    assert "<genres>" in xml
+    assert xml.count("<item>") == 2
 
 
 def test_total_pairs_and_comparisons_are_exposed():

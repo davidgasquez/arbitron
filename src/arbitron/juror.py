@@ -1,5 +1,8 @@
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from decimal import Decimal
+import html
+from typing import Any
 
 from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai.messages import ModelResponse
@@ -28,12 +31,39 @@ You will compare two items and determine which one better fulfills the requireme
 Return `choice` as either "item_a" or "item_b".""".strip()
 
 
+def _value_to_xml(tag: str, value: Any) -> str:
+    """Render arbitrary JSON-like data into a simple XML fragment."""
+    if value is None:
+        return f"<{tag} />"
+
+    if isinstance(value, Mapping):
+        if not value:
+            return f"<{tag} />"
+
+        children = "\n".join(
+            _value_to_xml(str(child_tag), child_value)
+            for child_tag, child_value in value.items()
+        )
+        return f"<{tag}>\n{children}\n</{tag}>"
+
+    if isinstance(value, Sequence) and not isinstance(
+        value, (str, bytes, bytearray)
+    ):
+        if not value:
+            return f"<{tag} />"
+
+        children = "\n".join(
+            _value_to_xml("item", child_value) for child_value in value
+        )
+        return f"<{tag}>\n{children}\n</{tag}>"
+
+    return f"<{tag}>{html.escape(str(value))}</{tag}>"
+
+
 def _format_item_block(tag: str, item: Item) -> str:
     """Return the XML-like block describing an item."""
-    description_line = (
-        f"<description>{item.description}</description>" if item.description else ""
-    )
-    return f"<{tag}>\n<id>{item.id}</id>\n{description_line}\n</{tag}>"
+    payload = item.prompt_payload()
+    return _value_to_xml(tag, payload)
 
 
 def _build_user_prompt(
