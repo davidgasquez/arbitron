@@ -1,52 +1,37 @@
-from pydantic_ai import Agent as PydanticAgent
+from arbitron import Competition, Item, Juror
 
-from arbitron import ComparisonDecision, Competition, Item, Juror
-
-movies = [
-    Item(id="arrival"),
-    Item(id="blade_runner"),
-    Item(id="interstellar"),
-    Item(id="inception"),
-    Item(id="the_dark_knight"),
-    Item(id="dune"),
-    Item(id="the_matrix"),
-    Item(id="2001_space_odyssey"),
-    Item(id="the_fifth_element"),
-    Item(id="the_martian"),
+items = [
+    Item(id="Arrival"),
+    Item(id="Interstellar"),
+    Item(id="Inception"),
+    Item(id="Lord of the Rings"),
 ]
 
 jurors = [
     Juror(
         id="SciFi Purist",
-        instructions="Compare based on scientific accuracy and hard sci-fi concepts.",
+        instructions="Score based on impact and originality of the soundtrack.",
         model="openai:gpt-5-nano",
     ),
     Juror(
-        id="Custom Composer",
-        agent=PydanticAgent(
-            model="openai:gpt-5-nano",
-            instructions="You are a film composer evaluating the emotional impact of each soundtrack.",
-            output_type=ComparisonDecision,
-        ),
+        id="Soundtrack Enthusiast",
+        instructions="Score based on emotional impact and memorability of the soundtrack.",
+        model="openai:gpt-5-nano",
     ),
 ]
 
 competition = Competition(
     id="sci-fi-soundtracks",
-    description="Rank the movies based on their soundtrack quality.",
+    description="Which movie has the better soundtrack?",
     jurors=jurors,
-    items=movies,
+    items=items,
+    concurrency=12,
 )
 
-comparisons = competition.run()
-competition.to_csv("comparisons.csv")
+print(f"Total pairs: {competition.total_pairs}")
+print(f"Total comparisons: {competition.total_comparisons}")
 
-wins = {movie.id: 0 for movie in movies}
-for comparison in comparisons:
-    wins[comparison.winner] = wins.get(comparison.winner, 0) + 1
+for comparison in competition.run():
+    print(comparison)
 
-leaderboard = sorted(wins.items(), key=lambda entry: entry[1], reverse=True)
-
-print("Leaderboard (wins):")
-for rank, (item_id, count) in enumerate(leaderboard, start=1):
-    print(f"{rank}. {item_id}: {count}")
+print(f"Total cost: {competition.cost}")

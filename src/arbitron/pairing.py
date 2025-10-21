@@ -1,18 +1,53 @@
 import itertools
 import random
-from typing import List, Tuple
+from abc import ABC, abstractmethod
+from typing import List, Sequence, Tuple
 
 from .models import Item
 
-
-def all_pairs(items: List[Item]) -> List[Tuple[Item, Item]]:
-    """Generate all possible pairs from a list of items."""
-    return list(itertools.combinations(items, 2))
+Pair = Tuple[Item, Item]
 
 
-def sample_pairs(items: List[Item], k: int) -> List[Tuple[Item, Item]]:
-    """Generate a random sample of k pairs from a list of items."""
-    all_item_pairs = all_pairs(items)
-    if k >= len(all_item_pairs):
-        return all_item_pairs
-    return random.sample(all_item_pairs, k)
+class PairSampler(ABC):
+    """Interface for generating item pairings."""
+
+    @abstractmethod
+    def sample(self, items: Sequence[Item]) -> List[Pair]:
+        """Return the list of item pairs to evaluate."""
+
+
+class AllPairsSampler(PairSampler):
+    """Generate every unique pair of items."""
+
+    def sample(self, items: Sequence[Item]) -> List[Pair]:
+        return list(itertools.combinations(items, 2))
+
+
+class RandomPairsSampler(PairSampler):
+    """Generate a deterministic random subset of item pairs."""
+
+    def __init__(self, count: int, seed: int | None = None) -> None:
+        if count < 1:
+            raise ValueError("count must be at least 1")
+        self._count = count
+        self._seed = seed
+
+    def sample(self, items: Sequence[Item]) -> List[Pair]:
+        pairs = list(itertools.combinations(items, 2))
+        rng = random.Random(self._seed)
+        if self._count >= len(pairs):
+            rng.shuffle(pairs)
+            return pairs
+
+        return rng.sample(pairs, self._count)
+
+
+DEFAULT_PAIR_SAMPLER = AllPairsSampler()
+
+
+__all__ = [
+    "PairSampler",
+    "AllPairsSampler",
+    "RandomPairsSampler",
+    "DEFAULT_PAIR_SAMPLER",
+]

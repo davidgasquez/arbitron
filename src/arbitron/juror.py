@@ -1,17 +1,15 @@
 from datetime import datetime, timezone
+from decimal import Decimal
+
 from pydantic_ai import Agent as PydanticAgent
+from pydantic_ai.messages import ModelResponse
 
-from .models import Comparison, ComparisonDecision, Item, Juror
+from .models import Comparison, ComparisonChoice, Item, Juror
 
 
-def _default_instructions(juror: Juror, include_reasoning: bool) -> str:
+def _default_instructions(juror: Juror) -> str:
     """Create the instructions shown to the juror when none are provided."""
     focus = juror.instructions or "Compare items according to the task requirements."
-    reasoning_text = (
-        "- reasoning: Brief explanation of your decision (required)"
-        if include_reasoning
-        else ""
-    )
     return f"""
 You are {juror.id}, an expert evaluation juror.
 
@@ -27,9 +25,7 @@ You will compare two items and determine which one better fulfills the requireme
 3. Decide which item better meets the task.
 
 ## Output
-Return:
-- choice: Either "item_a" or "item_b" (required)
-{reasoning_text}""".strip()
+Return `choice` as either "item_a" or "item_b".""".strip()
 
 
 def _format_item_block(tag: str, item: Item) -> str:
@@ -41,12 +37,9 @@ def _format_item_block(tag: str, item: Item) -> str:
 
 
 def _build_user_prompt(
-    description: str, item_a: Item, item_b: Item, include_reasoning: bool
+    description: str, item_a: Item, item_b: Item
 ) -> str:
     """Create the user prompt delivered to the juror."""
-    reasoning_line = (
-        "Include a brief reasoning explaining your decision." if include_reasoning else ""
-    )
     return f"""<task>
 {description}
 </task>
@@ -60,7 +53,6 @@ def _build_user_prompt(
 <instruction>
 Compare the two items above and determine which one better fulfills the task requirements.
 Return your choice as either "item_a" or "item_b".
-{reasoning_line}
 </instruction>"""
 
 
@@ -70,10 +62,10 @@ def _resolve_agent(
     """Return a Juror-ready Agent, using defaults when needed."""
     if juror.agent is None:
         model = juror.model or "openai:gpt-5-nano"
-        return PydanticAgent(
+        return PydanticAgent[None, ComparisonChoice](
             model=model,
             instructions=instructions,
-            output_type=ComparisonDecision,
+            output_type=ComparisonChoice,
             retries=3,
         )
 
@@ -89,26 +81,53 @@ async def run_juror(
     description: str,
     item_a: Item,
     item_b: Item,
-    include_reasoning: bool = False,
 ) -> Comparison:
     """Execute a pairwise comparison using the provided juror."""
-    instructions = _default_instructions(juror, include_reasoning)
-    user_prompt = _build_user_prompt(description, item_a, item_b, include_reasoning)
+    instructions = _default_instructions(juror)
+    user_prompt = _build_user_prompt(description, item_a, item_b)
     agent = _resolve_agent(juror, instructions)
 
     result = await agent.run(user_prompt)
-    output = result.output
+    try:
+        choice: ComparisonChoice = ComparisonChoice(result.output)
+    except ValueError as exc:  # pragma: no cover - defensive
+        msg = "Juror output must be 'item_a' or 'item_b'"
+        raise TypeError(msg) from exc
 
-    if not isinstance(output, ComparisonDecision):
-        raise TypeError("Juror output must match ComparisonDecision")
+    winner = item_a.id if choice is ComparisonChoice.item_a else item_b.id
 
-    winner = {"item_a": item_a.id, "item_b": item_b.id}[output.choice]
+    total_cost = Decimal("0")
+    for message in result.new_messages():
+        if not isinstance(message, ModelResponse):
+            continue
+
+        try:
+            price = message.cost()
+        except LookupError:
+            continue
+        except Exception:
+            continue
+
+        if price is None:
+            continue
+
+        total_price = getattr(price, "total_price", None)
+        if total_price is None:
+            continue
+
+        total_cost += (
+            total_price
+            if isinstance(total_price, Decimal)
+            else Decimal(str(total_price))
+        )
+
+    comparison_cost = total_cost if total_cost != Decimal("0") else None
 
     return Comparison(
         juror_id=juror.id,
         item_a=item_a.id,
         item_b=item_b.id,
         winner=winner,
-        rationale=output.reasoning if include_reasoning else None,
         created_at=datetime.now(timezone.utc),
+        cost=comparison_cost,
     )
