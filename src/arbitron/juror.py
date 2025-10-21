@@ -16,19 +16,9 @@ def _default_instructions(juror: Juror) -> str:
     return f"""
 You are an expert juror.
 
-## Guidance
+## Goal
 
 {focus}
-
-## Task
-
-You will compare two items and determine which one better fulfills the requirements of a given task.
-
-## Process
-
-1. Read and understand the task requirements.
-2. Analyze each item against those requirements.
-3. Decide which item better meets the task.
 
 ## Output
 

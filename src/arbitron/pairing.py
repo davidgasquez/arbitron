@@ -17,10 +17,16 @@ class PairSampler(ABC):
 
 
 class AllPairsSampler(PairSampler):
-    """Generate every unique pair of items."""
+    """Generate every unique pair of items in a randomized order."""
+
+    def __init__(self, seed: int | None = None) -> None:
+        self._seed = seed
 
     def sample(self, items: Sequence[Item]) -> List[Pair]:
-        return list(itertools.combinations(items, 2))
+        pairs = list(itertools.combinations(items, 2))
+        rng = random.Random(self._seed)
+        rng.shuffle(pairs)
+        return pairs
 
 
 class RandomPairsSampler(PairSampler):
