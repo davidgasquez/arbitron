@@ -1,7 +1,7 @@
+import html
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from decimal import Decimal
-import html
 from typing import Any
 
 from pydantic_ai import Agent as PydanticAgent
@@ -14,20 +14,24 @@ def _default_instructions(juror: Juror) -> str:
     """Create the instructions shown to the juror when none are provided."""
     focus = juror.instructions or "Compare items according to the task requirements."
     return f"""
-You are {juror.id}, an expert evaluation juror.
+You are an expert juror.
 
 ## Guidance
+
 {focus}
 
 ## Task
+
 You will compare two items and determine which one better fulfills the requirements of a given task.
 
 ## Process
+
 1. Read and understand the task requirements.
 2. Analyze each item against those requirements.
 3. Decide which item better meets the task.
 
 ## Output
+
 Return `choice` as either "item_a" or "item_b".""".strip()
 
 
@@ -46,9 +50,7 @@ def _value_to_xml(tag: str, value: Any) -> str:
         )
         return f"<{tag}>\n{children}\n</{tag}>"
 
-    if isinstance(value, Sequence) and not isinstance(
-        value, (str, bytes, bytearray)
-    ):
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         if not value:
             return f"<{tag} />"
 
@@ -66,9 +68,7 @@ def _format_item_block(tag: str, item: Item) -> str:
     return _value_to_xml(tag, payload)
 
 
-def _build_user_prompt(
-    description: str, item_a: Item, item_b: Item
-) -> str:
+def _build_user_prompt(description: str, item_a: Item, item_b: Item) -> str:
     """Create the user prompt delivered to the juror."""
     return f"""<task>
 {description}
@@ -86,9 +86,7 @@ Return your choice as either "item_a" or "item_b".
 </instruction>"""
 
 
-def _resolve_agent(
-    juror: Juror, instructions: str
-) -> PydanticAgent:
+def _resolve_agent(juror: Juror, instructions: str) -> PydanticAgent:
     """Return a Juror-ready Agent, using defaults when needed."""
     if juror.agent is None:
         model = juror.model or "openai:gpt-5-nano"

@@ -75,9 +75,7 @@ async def run_async_iter(
                     item_b.id,
                     juror_config.id,
                 )
-                comparison = await run_juror(
-                    juror_config, description, item_a, item_b
-                )
+                comparison = await run_juror(juror_config, description, item_a, item_b)
                 logger.info("%s chose %s", juror_config.id, comparison.winner)
                 return comparison
 
