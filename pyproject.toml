@@ -1,6 +1,6 @@
 [project]
 name = "arbitron"
-version = "0.5.4"
+version = "0.5.5"
 description = "Multi-agent collaboration through pairwise comparisons"
 readme = "README.md"
 authors = [{ name = "David Gasquez", email = "davidgasquez@gmail.com" }]
