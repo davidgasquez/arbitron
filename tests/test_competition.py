@@ -1,4 +1,5 @@
 import itertools
+import random
 
 import pytest
 from pydantic import BaseModel
@@ -9,6 +10,7 @@ from arbitron import Competition, Item, Juror
 from arbitron.juror import _format_item_block
 from arbitron.models import ComparisonChoice
 from arbitron.pairing import RandomPairsSampler
+from arbitron.runner import _randomize_pair_orientations
 
 
 @pytest.fixture(autouse=True)
@@ -128,9 +130,9 @@ def test_random_sampler_pairs_are_cached_and_reused():
 
     assert len(comparisons) == competition.total_comparisons
     produced_pairs = {
-        (comparison.item_a, comparison.item_b) for comparison in comparisons
+        frozenset((comparison.item_a, comparison.item_b)) for comparison in comparisons
     }
-    expected_pairs = {(pair[0].id, pair[1].id) for pair in initial_pairs}
+    expected_pairs = {frozenset((pair[0].id, pair[1].id)) for pair in initial_pairs}
     assert produced_pairs == expected_pairs
 
 
@@ -158,3 +160,26 @@ def test_random_sampler_shuffles_when_requesting_all_pairs():
     assert {(item_a.id, item_b.id) for item_a, item_b in shuffled_pairs} == {
         (item_a.id, item_b.id) for item_a, item_b in all_pairs
     }
+
+
+def test_pair_orientation_randomization_uses_seed():
+    pairs = [
+        (Item(id="A"), Item(id="B")),
+        (Item(id="C"), Item(id="D")),
+        (Item(id="E"), Item(id="F")),
+    ]
+
+    rng = random.Random(0)
+    randomized = _randomize_pair_orientations(pairs, rng)
+
+    assert [(item_a.id, item_b.id) for item_a, item_b in randomized] == [
+        ("B", "A"),
+        ("D", "C"),
+        ("E", "F"),
+    ]
+    # Ensure the original list remains unchanged
+    assert [(item_a.id, item_b.id) for item_a, item_b in pairs] == [
+        ("A", "B"),
+        ("C", "D"),
+        ("E", "F"),
+    ]

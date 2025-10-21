@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from contextlib import contextmanager, suppress
 from typing import AsyncIterator, List, Tuple
 
@@ -36,6 +37,20 @@ def _configure_logging(verbose: bool):
         logger.propagate = previous_propagate
 
 
+def _randomize_pair_orientations(
+    pairs: List[Tuple[Item, Item]],
+    rng: random.Random,
+) -> List[Tuple[Item, Item]]:
+    """Return a copy of pairs with each orientation decided by the RNG."""
+    randomized: List[Tuple[Item, Item]] = []
+    for item_a, item_b in pairs:
+        if rng.randrange(2):
+            randomized.append((item_b, item_a))
+        else:
+            randomized.append((item_a, item_b))
+    return randomized
+
+
 async def run_async_iter(
     description: str,
     jurors: List[Juror],
@@ -44,6 +59,7 @@ async def run_async_iter(
     verbose: bool = False,
     pair_sampler: PairSampler | None = None,
     pairs: List[Tuple[Item, Item]] | None = None,
+    pair_shuffle_seed: int | None = None,
 ) -> AsyncIterator[Comparison]:
     """
     Run pairwise comparisons between items using multiple jurors.
@@ -61,6 +77,11 @@ async def run_async_iter(
     if pairs is None:
         sampler = pair_sampler or AllPairsSampler()
         pairs = sampler.sample(items)
+    else:
+        pairs = list(pairs)
+
+    rng = random.Random(pair_shuffle_seed)
+    pairs = _randomize_pair_orientations(pairs, rng)
 
     with _configure_logging(verbose):
         semaphore = asyncio.Semaphore(concurrency)
@@ -81,8 +102,8 @@ async def run_async_iter(
 
         tasks = [
             asyncio.create_task(compare_pair(juror_config, item_a, item_b))
-            for juror_config in jurors
             for item_a, item_b in pairs
+            for juror_config in jurors
         ]
 
         try:
@@ -103,6 +124,7 @@ async def run_async(
     concurrency: int = 4,
     verbose: bool = False,
     pair_sampler: PairSampler | None = None,
+    pair_shuffle_seed: int | None = None,
 ) -> List[Comparison]:
     """Run pairwise comparisons and collect all results."""
     return [
@@ -114,6 +136,7 @@ async def run_async(
             concurrency,
             verbose,
             pair_sampler,
+            pair_shuffle_seed=pair_shuffle_seed,
         )
     ]
 
@@ -125,6 +148,7 @@ def run(
     concurrency: int = 4,
     verbose: bool = False,
     pair_sampler: PairSampler | None = None,
+    pair_shuffle_seed: int | None = None,
 ) -> List[Comparison]:
     """
     Synchronous wrapper for run_async.
@@ -137,5 +161,6 @@ def run(
             concurrency,
             verbose,
             pair_sampler,
+            pair_shuffle_seed,
         )
     )
