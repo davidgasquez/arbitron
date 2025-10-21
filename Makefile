@@ -15,3 +15,7 @@ publish: build
 lint:
 	uvx ruff check
 	uvx ty check
+
+.PHONY: tests
+tests:
+	uv run --env-file .env python -m pytest

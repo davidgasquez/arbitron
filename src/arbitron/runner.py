@@ -1,12 +1,11 @@
 import asyncio
 import logging
-from contextlib import contextmanager
-from typing import List, Tuple
+from contextlib import contextmanager, suppress
+from typing import AsyncIterator, List, Tuple
 
 from .juror import run_juror
 from .models import Comparison, Item, Juror
-from .pairing import all_pairs, sample_pairs
-
+from .pairing import AllPairsSampler, PairSampler
 
 logger = logging.getLogger("arbitron.runner")
 if not logger.handlers:
@@ -37,15 +36,15 @@ def _configure_logging(verbose: bool):
         logger.propagate = previous_propagate
 
 
-async def run_async(
+async def run_async_iter(
     description: str,
     jurors: List[Juror],
     items: List[Item],
-    comparisons_per_juror: int | None = None,
-    include_reasoning: bool = False,
     concurrency: int = 4,
     verbose: bool = False,
-) -> List[Comparison]:
+    pair_sampler: PairSampler | None = None,
+    pairs: List[Tuple[Item, Item]] | None = None,
+) -> AsyncIterator[Comparison]:
     """
     Run pairwise comparisons between items using multiple jurors.
 
@@ -53,19 +52,15 @@ async def run_async(
         description: Task description for the comparison
         jurors: List of juror configurations
         items: List of items to compare
-        comparisons_per_juror: Number of distinct item pairs each juror evaluates
-            (None runs all unique pairs)
-        include_reasoning: Whether to request rationale text from jurors
         concurrency: Maximum number of concurrent comparisons
+        pair_sampler: Pair sampling strategy
 
     Returns:
-        List of comparison results
+        Async iterator of comparison results
     """
-    pairs: List[Tuple[Item, Item]] = (
-        all_pairs(items)
-        if comparisons_per_juror is None
-        else sample_pairs(items, comparisons_per_juror)
-    )
+    if pairs is None:
+        sampler = pair_sampler or AllPairsSampler()
+        pairs = sampler.sample(items)
 
     with _configure_logging(verbose):
         semaphore = asyncio.Semaphore(concurrency)
@@ -81,30 +76,57 @@ async def run_async(
                     juror_config.id,
                 )
                 comparison = await run_juror(
-                    juror_config, description, item_a, item_b, include_reasoning
+                    juror_config, description, item_a, item_b
                 )
-                logger.info(
-                    "%s chose %s", juror_config.id, comparison.winner
-                )
+                logger.info("%s chose %s", juror_config.id, comparison.winner)
                 return comparison
 
         tasks = [
-            compare_pair(juror_config, item_a, item_b)
+            asyncio.create_task(compare_pair(juror_config, item_a, item_b))
             for juror_config in jurors
             for item_a, item_b in pairs
         ]
 
-        return await asyncio.gather(*tasks)
+        try:
+            for future in asyncio.as_completed(tasks):
+                yield await future
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await task
+
+
+async def run_async(
+    description: str,
+    jurors: List[Juror],
+    items: List[Item],
+    concurrency: int = 4,
+    verbose: bool = False,
+    pair_sampler: PairSampler | None = None,
+) -> List[Comparison]:
+    """Run pairwise comparisons and collect all results."""
+    return [
+        comparison
+        async for comparison in run_async_iter(
+            description,
+            jurors,
+            items,
+            concurrency,
+            verbose,
+            pair_sampler,
+        )
+    ]
 
 
 def run(
     description: str,
     jurors: List[Juror],
     items: List[Item],
-    comparisons_per_juror: int | None = None,
-    include_reasoning: bool = False,
     concurrency: int = 4,
     verbose: bool = False,
+    pair_sampler: PairSampler | None = None,
 ) -> List[Comparison]:
     """
     Synchronous wrapper for run_async.
@@ -114,9 +136,8 @@ def run(
             description,
             jurors,
             items,
-            comparisons_per_juror,
-            include_reasoning,
             concurrency,
             verbose,
+            pair_sampler,
         )
     )
