@@ -33,7 +33,7 @@ jurors = [
     Juror(
         id="Soundtrack Enthusiast",
         instructions="Score based on emotional impact and memorability of the soundtrack.",
-        model="openai:gpt-5-nano",
+        model="google-gla:gemini-2.5-flash-lite",
     ),
 ]
 
