@@ -23,50 +23,29 @@ pip install arbitron
 Setup your favorite LLM provider's API keys in the environment (e.g: `OPENAI_API_KEY`) and then run the following code.
 
 ```python
-from pydantic_ai import Agent as PydanticAgent
+from arbitron import Competition, Item, Juror
 
-from arbitron import ComparisonDecision, Competition, Item, Juror
-
-movies = [
+items = [
     Item(id="arrival"),
-    Item(id="blade_runner"),
     Item(id="interstellar"),
     Item(id="inception"),
-    Item(id="the_dark_knight"),
-    Item(id="dune"),
-    Item(id="the_matrix"),
-    Item(id="2001_space_odyssey"),
-    Item(id="the_fifth_element"),
-    Item(id="the_martian"),
 ]
 
 jurors = [
-    Juror(
-        id="SciFi Purist",
-        instructions="Compare based on scientific accuracy and hard sci-fi concepts.",
-        model="openai:gpt-5-nano",
-    ),
-    Juror(
-        id="Composer Special",
-        agent=PydanticAgent(
-            model="openai:gpt-5-nano",
-            instructions="You are a film composer judging the emotional depth of each soundtrack.",
-            output_type=ComparisonDecision,
-        ),
-    ),
+    Juror(id="SciFi Purist", model="openai:gpt-5-nano"),
 ]
 
 competition = Competition(
     id="sci-fi-soundtracks",
-    description="Rank the movies based on their soundtrack quality.",
+    description="Which movie has the better soundtrack?",
     jurors=jurors,
-    items=movies,
+    items=items,
 )
 
-comparisons = competition.run()
-competition.to_csv("comparisons.csv")
+for comparison in competition.run():
+    print(comparison)
 
-# Use choix or any other tool you like with the comparisons!
+print(f"Total cost: {competition.cost}")
 ```
 
 ## 🏛️ License
