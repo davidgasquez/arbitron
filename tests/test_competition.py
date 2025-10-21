@@ -100,9 +100,7 @@ def test_random_sampler_pairs_are_cached_and_reused():
     produced_pairs = {
         (comparison.item_a, comparison.item_b) for comparison in comparisons
     }
-    expected_pairs = {
-        (pair[0].id, pair[1].id) for pair in initial_pairs
-    }
+    expected_pairs = {(pair[0].id, pair[1].id) for pair in initial_pairs}
     assert produced_pairs == expected_pairs
 
 
@@ -127,8 +125,6 @@ def test_random_sampler_shuffles_when_requesting_all_pairs():
 
     assert len(shuffled_pairs) == len(all_pairs)
     assert shuffled_pairs != all_pairs
-    assert {
-        (item_a.id, item_b.id) for item_a, item_b in shuffled_pairs
-    } == {
+    assert {(item_a.id, item_b.id) for item_a, item_b in shuffled_pairs} == {
         (item_a.id, item_b.id) for item_a, item_b in all_pairs
     }

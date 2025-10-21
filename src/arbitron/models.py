@@ -1,6 +1,7 @@
+from enum import Enum
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -19,7 +20,9 @@ class Juror(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-ComparisonChoice = Literal["item_a", "item_b"]
+class ComparisonChoice(str, Enum):
+    item_a = "item_a"
+    item_b = "item_b"
 
 
 class Comparison(BaseModel):

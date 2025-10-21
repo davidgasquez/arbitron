@@ -88,12 +88,13 @@ async def run_juror(
     agent = _resolve_agent(juror, instructions)
 
     result = await agent.run(user_prompt)
-    output: ComparisonChoice = result.output
-    if output not in {"item_a", "item_b"}:
+    try:
+        choice: ComparisonChoice = ComparisonChoice(result.output)
+    except ValueError as exc:  # pragma: no cover - defensive
         msg = "Juror output must be 'item_a' or 'item_b'"
-        raise TypeError(msg)
+        raise TypeError(msg) from exc
 
-    winner = {"item_a": item_a.id, "item_b": item_b.id}[output]
+    winner = item_a.id if choice is ComparisonChoice.item_a else item_b.id
 
     total_cost = Decimal("0")
     for message in result.new_messages():
