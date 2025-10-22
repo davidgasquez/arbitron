@@ -60,8 +60,9 @@ def _format_item_block(tag: str, item: Item) -> str:
 
 def _build_user_prompt(description: str, item_a: Item, item_b: Item) -> str:
     """Create the user prompt delivered to the juror."""
+    safe_description = html.escape(description)
     return f"""<task>
-{description}
+{safe_description}
 </task>
 
 <comparison>
@@ -78,20 +79,17 @@ Return your choice as either "item_a" or "item_b".
 
 def _resolve_agent(juror: Juror, instructions: str) -> PydanticAgent:
     """Return a Juror-ready Agent, using defaults when needed."""
-    if juror.agent is None:
-        model = juror.model or "openai:gpt-5-nano"
-        return PydanticAgent[None, ComparisonChoice](
-            model=model,
+    agent = juror.agent
+    if agent is None:
+        agent = PydanticAgent[None, ComparisonChoice](
+            model=juror.model or "openai:gpt-5-nano",
             instructions=instructions,
             output_type=ComparisonChoice,
             retries=3,
         )
-
-    if isinstance(juror.agent, PydanticAgent):
-        return juror.agent
-
-    msg = "juror.agent must be a pydantic_ai.Agent instance"
-    raise TypeError(msg)
+    if isinstance(agent, PydanticAgent):
+        return agent
+    raise TypeError("juror.agent must be a pydantic_ai.Agent instance")
 
 
 async def run_juror(
@@ -109,8 +107,7 @@ async def run_juror(
     try:
         choice: ComparisonChoice = ComparisonChoice(result.output)
     except ValueError as exc:  # pragma: no cover - defensive
-        msg = "Juror output must be 'item_a' or 'item_b'"
-        raise TypeError(msg) from exc
+        raise TypeError("Juror output must be 'item_a' or 'item_b'") from exc
 
     winner = item_a.id if choice is ComparisonChoice.item_a else item_b.id
 
@@ -118,21 +115,18 @@ async def run_juror(
     for message in result.new_messages():
         if not isinstance(message, ModelResponse):
             continue
-
+        # Be permissive: providers may not expose cost(), or it may return
+        # objects without total_price.
+        price = None
         try:
             price = message.cost()
-        except LookupError:
-            continue
         except Exception:
-            continue
-
+            pass
         if price is None:
             continue
-
         total_price = getattr(price, "total_price", None)
         if total_price is None:
             continue
-
         total_cost += (
             total_price
             if isinstance(total_price, Decimal)

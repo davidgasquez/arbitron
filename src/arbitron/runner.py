@@ -42,13 +42,10 @@ def _randomize_pair_orientations(
     rng: random.Random,
 ) -> List[Tuple[Item, Item]]:
     """Return a copy of pairs with each orientation decided by the RNG."""
-    randomized: List[Tuple[Item, Item]] = []
-    for item_a, item_b in pairs:
-        if rng.randrange(2):
-            randomized.append((item_b, item_a))
-        else:
-            randomized.append((item_a, item_b))
-    return randomized
+    return [
+        (item_b, item_a) if rng.randrange(2) else (item_a, item_b)
+        for item_a, item_b in pairs
+    ]
 
 
 async def run_async_iter(

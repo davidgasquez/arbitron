@@ -2,11 +2,11 @@ import asyncio
 import csv
 from decimal import Decimal
 from pathlib import Path
-from queue import Queue
+from queue import SimpleQueue
 from threading import Thread
 from typing import Iterator, List
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 from .models import Comparison, Item, Juror
 from .pairing import AllPairsSampler, PairSampler
@@ -24,6 +24,7 @@ class Competition(BaseModel):
     verbose: bool = False
     comparisons: List[Comparison] | None = None
     pair_sampler: PairSampler = Field(default_factory=AllPairsSampler)
+    pair_shuffle_seed: int | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     _pairs: List[Pair] | None = PrivateAttr(default=None)
@@ -65,11 +66,11 @@ class Competition(BaseModel):
 
         def iterator() -> Iterator[Comparison]:
             comparisons: List[Comparison] = []
-            output_queue: Queue[Comparison | Exception | None] = Queue()
+            q: SimpleQueue = SimpleQueue()
             pairs = self._ensure_pairs()
 
-            def producer() -> None:
-                async def consume() -> None:
+            def _producer() -> None:
+                async def _consume() -> None:
                     try:
                         async for comparison in run_async_iter(
                             description=self.description,
@@ -79,25 +80,23 @@ class Competition(BaseModel):
                             verbose=self.verbose,
                             pair_sampler=self.pair_sampler,
                             pairs=pairs,
+                            pair_shuffle_seed=self.pair_shuffle_seed,
                         ):
-                            output_queue.put(comparison)
+                            q.put(comparison)
                     except Exception as exc:  # pragma: no cover - passthrough
-                        output_queue.put(exc)
+                        q.put(exc)
                     finally:
-                        output_queue.put(None)
+                        q.put(None)
 
-                asyncio.run(consume())
+                asyncio.run(_consume())
 
-            worker = Thread(target=producer, daemon=True)
+            worker = Thread(target=_producer, daemon=True)
             worker.start()
 
             try:
-                while True:
-                    item = output_queue.get()
+                for item in iter(q.get, None):
                     if isinstance(item, Exception):
                         raise item
-                    if item is None:
-                        break
                     comparisons.append(item)
                     if item.cost is not None:
                         self._total_cost += item.cost
@@ -114,6 +113,7 @@ class Competition(BaseModel):
             raise ValueError("Run the competition before exporting results.")
 
         output_path = Path(path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         fieldnames = [
             "competition_id",
             "juror_id",
@@ -139,3 +139,30 @@ class Competition(BaseModel):
                         str(comparison.cost) if comparison.cost is not None else ""
                     ),
                 })
+
+    @model_validator(mode="after")
+    def _validate_unique_ids(self) -> "Competition":
+        """Ensure items and jurors provide unique identifiers."""
+
+        def _duplicates(values: list[str]) -> list[str]:
+            seen: set[str] = set()
+            duplicates: set[str] = set()
+            for value in values:
+                if value in seen:
+                    duplicates.add(value)
+                else:
+                    seen.add(value)
+            return sorted(duplicates)
+
+        item_ids = [item.id for item in self.items]
+        juror_ids = [juror.id for juror in self.jurors]
+
+        duplicate_items = _duplicates(item_ids)
+        if duplicate_items:
+            raise ValueError(f"Duplicate item ids: {duplicate_items}")
+
+        duplicate_jurors = _duplicates(juror_ids)
+        if duplicate_jurors:
+            raise ValueError(f"Duplicate juror ids: {duplicate_jurors}")
+
+        return self

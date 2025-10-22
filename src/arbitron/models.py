@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class Item(BaseModel):
@@ -15,10 +15,9 @@ class Item(BaseModel):
 
     def prompt_payload(self) -> dict[str, Any]:
         """Return a JSON-serializable mapping ready for prompt rendering."""
-        data: dict[str, Any] = {}
-        if self.payload is not None:
-            data = self._serialise_payload(self.payload)
-
+        data: dict[str, Any] = (
+            self._serialise_payload(self.payload) if self.payload is not None else {}
+        )
         data["id"] = self.id
         return data
 
@@ -50,10 +49,17 @@ class Item(BaseModel):
 class Juror(BaseModel):
     id: str
     instructions: str | None = None
-    model: str | None = "openai:gpt-5-nano"
+    model: str | None = None
     agent: Any = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @model_validator(mode="after")
+    def _exclusive_agent_or_model(self) -> "Juror":
+        """Allow either `agent` or `model`, but not both, to avoid ambiguity."""
+        if self.agent is not None and self.model is not None:
+            raise ValueError("Provide either `agent` or `model`, not both.")
+        return self
 
 
 class ComparisonChoice(str, Enum):

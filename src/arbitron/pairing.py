@@ -1,18 +1,18 @@
 import itertools
 import random
 from abc import ABC, abstractmethod
-from typing import List, Sequence, Tuple
+from typing import Sequence
 
 from .models import Item
 
-Pair = Tuple[Item, Item]
+Pair = tuple[Item, Item]
 
 
 class PairSampler(ABC):
     """Interface for generating item pairings."""
 
     @abstractmethod
-    def sample(self, items: Sequence[Item]) -> List[Pair]:
+    def sample(self, items: Sequence[Item]) -> list[Pair]:
         """Return the list of item pairs to evaluate."""
 
 
@@ -22,7 +22,7 @@ class AllPairsSampler(PairSampler):
     def __init__(self, seed: int | None = None) -> None:
         self._seed = seed
 
-    def sample(self, items: Sequence[Item]) -> List[Pair]:
+    def sample(self, items: Sequence[Item]) -> list[Pair]:
         pairs = list(itertools.combinations(items, 2))
         rng = random.Random(self._seed)
         rng.shuffle(pairs)
@@ -38,7 +38,7 @@ class RandomPairsSampler(PairSampler):
         self._count = count
         self._seed = seed
 
-    def sample(self, items: Sequence[Item]) -> List[Pair]:
+    def sample(self, items: Sequence[Item]) -> list[Pair]:
         pairs = list(itertools.combinations(items, 2))
         rng = random.Random(self._seed)
         if self._count >= len(pairs):

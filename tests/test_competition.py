@@ -1,5 +1,6 @@
 import itertools
 import random
+from datetime import datetime, timezone
 
 import pytest
 from pydantic import BaseModel
@@ -7,8 +8,8 @@ from pydantic_ai import Agent, models
 from pydantic_ai.models.test import TestModel
 
 from arbitron import Competition, Item, Juror
-from arbitron.juror import _format_item_block
-from arbitron.models import ComparisonChoice
+from arbitron.juror import _build_user_prompt, _format_item_block, _resolve_agent
+from arbitron.models import Comparison, ComparisonChoice
 from arbitron.pairing import RandomPairsSampler
 from arbitron.runner import _randomize_pair_orientations
 
@@ -78,6 +79,12 @@ def test_item_prompt_renders_payload_as_xml():
     assert "<title>Arrival</title>" in xml
     assert "<genres>" in xml
     assert xml.count("<item>") == 2
+
+
+def test_build_user_prompt_escapes_task_description():
+    prompt = _build_user_prompt("Compare & rank A < B", Item(id="A"), Item(id="B"))
+
+    assert "<task>\nCompare &amp; rank A &lt; B\n</task>" in prompt
 
 
 def test_total_pairs_and_comparisons_are_exposed():
@@ -183,3 +190,113 @@ def test_pair_orientation_randomization_uses_seed():
         ("C", "D"),
         ("E", "F"),
     ]
+
+
+def test_competition_pair_shuffle_seed_reproducible(monkeypatch: pytest.MonkeyPatch):
+    items = [
+        Item(id="A"),
+        Item(id="B"),
+        Item(id="C"),
+    ]
+
+    orientations: list[tuple[str, str]] = []
+
+    async def fake_run_juror(
+        juror: Juror,
+        description: str,
+        item_a: Item,
+        item_b: Item,
+    ) -> Comparison:
+        orientations.append((item_a.id, item_b.id))
+        return Comparison(
+            juror_id=juror.id,
+            item_a=item_a.id,
+            item_b=item_b.id,
+            winner=item_a.id,
+            created_at=datetime.now(timezone.utc),
+            cost=None,
+        )
+
+    monkeypatch.setattr("arbitron.runner.run_juror", fake_run_juror)
+
+    juror = Juror(id="deterministic")
+
+    competition = Competition(
+        id="letters-orientation-seed",
+        description="Pick a letter",
+        jurors=[juror],
+        items=items,
+        pair_shuffle_seed=123,
+    )
+
+    first_winners = list(competition.run())
+    first_orientations = orientations.copy()
+    orientations.clear()
+
+    second_winners = list(competition.run())
+    second_orientations = orientations.copy()
+
+    assert sorted(first_orientations) == sorted(second_orientations)
+    assert sorted(
+        (comp.item_a, comp.item_b, comp.winner) for comp in first_winners
+    ) == [(*pair, pair[0]) for pair in sorted(first_orientations)]
+    assert sorted(
+        (comp.item_a, comp.item_b, comp.winner) for comp in second_winners
+    ) == [(*pair, pair[0]) for pair in sorted(second_orientations)]
+
+
+def test_to_csv_creates_parent_directories(tmp_path):
+    competition = Competition(
+        id="export",
+        description="Pick a letter",
+        jurors=[_build_test_juror()],
+        items=[Item(id="A"), Item(id="B")],
+    )
+
+    list(competition.run())
+
+    output_path = tmp_path / "nested" / "results" / "comparisons.csv"
+
+    competition.to_csv(output_path)
+
+    assert output_path.exists()
+
+
+def test_competition_rejects_duplicate_item_ids():
+    with pytest.raises(ValueError, match=r"Duplicate item ids: \['A'\]"):
+        Competition(
+            id="dupe-items",
+            description="Pick a letter",
+            jurors=[_build_test_juror()],
+            items=[Item(id="A"), Item(id="A")],
+        )
+
+
+def test_competition_rejects_duplicate_juror_ids():
+    with pytest.raises(ValueError, match=r"Duplicate juror ids: \['unit-test'\]"):
+        Competition(
+            id="dupe-jurors",
+            description="Pick a letter",
+            jurors=[_build_test_juror(), _build_test_juror()],
+            items=[Item(id="A"), Item(id="B")],
+        )
+
+
+def test_juror_rejects_agent_and_model():
+    agent = Agent(
+        model=TestModel(),
+        instructions="Fake juror used for unit tests.",
+        output_type=ComparisonChoice,
+    )
+
+    with pytest.raises(ValueError, match="either `agent` or `model`"):
+        Juror(id="conflicted", agent=agent, model="custom:model")
+
+
+def test_resolve_agent_defaults_to_openai_model():
+    juror = Juror(id="defaults")
+
+    agent = _resolve_agent(juror, "Instructions")
+
+    assert juror.model is None
+    assert getattr(agent.model, "model_name", None) == "gpt-5-nano"
