@@ -33,7 +33,6 @@ def _value_to_xml(tag: str, value: Any) -> str:
     if isinstance(value, Mapping):
         if not value:
             return f"<{tag} />"
-
         children = "\n".join(
             _value_to_xml(str(child_tag), child_value)
             for child_tag, child_value in value.items()
@@ -43,7 +42,6 @@ def _value_to_xml(tag: str, value: Any) -> str:
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         if not value:
             return f"<{tag} />"
-
         children = "\n".join(
             _value_to_xml("item", child_value) for child_value in value
         )
@@ -54,8 +52,7 @@ def _value_to_xml(tag: str, value: Any) -> str:
 
 def _format_item_block(tag: str, item: Item) -> str:
     """Return the XML-like block describing an item."""
-    payload = item.prompt_payload()
-    return _value_to_xml(tag, payload)
+    return _value_to_xml(tag, item.prompt_payload())
 
 
 def _build_user_prompt(description: str, item_a: Item, item_b: Item) -> str:
@@ -92,6 +89,30 @@ def _resolve_agent(juror: Juror, instructions: str) -> PydanticAgent:
     raise TypeError("juror.agent must be a pydantic_ai.Agent instance")
 
 
+def _extract_total_cost(result: Any) -> Decimal:
+    """Best-effort extraction and summation of total model cost from a result."""
+    total = Decimal("0")
+    # Providers may not expose cost(), or cost() may not include total_price.
+    for message in result.new_messages():
+        if not isinstance(message, ModelResponse):
+            continue
+        try:
+            price = message.cost()
+        except Exception:
+            continue
+        if price is None:
+            continue
+        total_price = getattr(price, "total_price", None)
+        if total_price is None:
+            continue
+        total += (
+            total_price
+            if isinstance(total_price, Decimal)
+            else Decimal(str(total_price))
+        )
+    return total
+
+
 async def run_juror(
     juror: Juror,
     description: str,
@@ -111,28 +132,7 @@ async def run_juror(
 
     winner = item_a.id if choice is ComparisonChoice.item_a else item_b.id
 
-    total_cost = Decimal("0")
-    for message in result.new_messages():
-        if not isinstance(message, ModelResponse):
-            continue
-        # Be permissive: providers may not expose cost(), or it may return
-        # objects without total_price.
-        price = None
-        try:
-            price = message.cost()
-        except Exception:
-            pass
-        if price is None:
-            continue
-        total_price = getattr(price, "total_price", None)
-        if total_price is None:
-            continue
-        total_cost += (
-            total_price
-            if isinstance(total_price, Decimal)
-            else Decimal(str(total_price))
-        )
-
+    total_cost = _extract_total_cost(result)
     comparison_cost = total_cost if total_cost != Decimal("0") else None
 
     return Comparison(
