@@ -38,74 +38,80 @@ class Competition(BaseModel):
     @property
     def pairs(self) -> List[Pair]:
         """Return cached item pairs for this competition."""
-
         return list(self._ensure_pairs())
 
     @property
     def total_pairs(self) -> int:
         """Total number of unique item pairs to be compared."""
-
         return len(self._ensure_pairs())
 
     @property
     def total_comparisons(self) -> int:
         """Total comparisons after accounting for all jurors."""
-
         return self.total_pairs * len(self.jurors)
 
     @property
     def cost(self) -> Decimal:
         """Return the accumulated model cost for this competition."""
-
         return self._total_cost
 
     def run(self) -> Iterator[Comparison]:
         """Stream comparison results as they are produced."""
-
         self._total_cost = Decimal("0")
+        pairs = self._ensure_pairs()
+        queue: SimpleQueue[Comparison | BaseException | None] = SimpleQueue()
+        worker = self._launch_worker(queue, pairs)
 
-        def iterator() -> Iterator[Comparison]:
-            comparisons: List[Comparison] = []
-            q: SimpleQueue = SimpleQueue()
-            pairs = self._ensure_pairs()
+        comparisons: list[Comparison] = []
 
-            def _producer() -> None:
-                async def _consume() -> None:
-                    try:
-                        async for comparison in run_async_iter(
-                            description=self.description,
-                            jurors=self.jurors,
-                            items=self.items,
-                            concurrency=self.concurrency,
-                            verbose=self.verbose,
-                            pair_sampler=self.pair_sampler,
-                            pairs=pairs,
-                            pair_shuffle_seed=self.pair_shuffle_seed,
-                        ):
-                            q.put(comparison)
-                    except Exception as exc:  # pragma: no cover - passthrough
-                        q.put(exc)
-                    finally:
-                        q.put(None)
+        try:
+            while True:
+                message = queue.get()
+                if message is None:
+                    break
+                if isinstance(message, BaseException):
+                    raise message
 
-                asyncio.run(_consume())
+                comparison = message
+                comparisons.append(comparison)
+                if comparison.cost is not None:
+                    self._total_cost += comparison.cost
+                yield comparison
+        finally:
+            worker.join()
+            self.comparisons = comparisons
 
-            worker = Thread(target=_producer, daemon=True)
-            worker.start()
+    def _launch_worker(
+        self,
+        queue: SimpleQueue[Comparison | BaseException | None],
+        pairs: List[Pair],
+    ) -> Thread:
+        """Spin up the background worker that bridges async execution."""
 
-            try:
-                for item in iter(q.get, None):
-                    if isinstance(item, Exception):
-                        raise item
-                    comparisons.append(item)
-                    if item.cost is not None:
-                        self._total_cost += item.cost
-                    yield item
-            finally:
-                worker.join()
-                self.comparisons = comparisons
+        def _produce() -> None:
+            async def _consume() -> None:
+                try:
+                    async for comparison in run_async_iter(
+                        description=self.description,
+                        jurors=self.jurors,
+                        items=self.items,
+                        concurrency=self.concurrency,
+                        verbose=self.verbose,
+                        pair_sampler=self.pair_sampler,
+                        pairs=pairs,
+                        pair_shuffle_seed=self.pair_shuffle_seed,
+                    ):
+                        queue.put(comparison)
+                except Exception as exc:  # pragma: no cover - passthrough
+                    queue.put(exc)
+                finally:
+                    queue.put(None)
 
-        return iterator()
+            asyncio.run(_consume())
+
+        worker = Thread(target=_produce, daemon=True)
+        worker.start()
+        return worker
 
     def to_csv(self, path: str | Path) -> None:
         """Persist comparison results to a CSV file."""

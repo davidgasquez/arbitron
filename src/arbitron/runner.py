@@ -2,7 +2,7 @@ import asyncio
 import logging
 import random
 from contextlib import contextmanager, suppress
-from typing import AsyncIterator, List, Tuple
+from typing import AsyncIterator, Iterator, List, Tuple
 
 from .juror import run_juror
 from .models import Comparison, Item, Juror
@@ -14,7 +14,7 @@ if not logger.handlers:
 
 
 @contextmanager
-def _configure_logging(verbose: bool):
+def _configure_logging(verbose: bool) -> Iterator[None]:
     """Temporarily enable runner logging."""
     if not verbose:
         yield
@@ -48,6 +48,9 @@ def _randomize_pair_orientations(
     ]
 
 
+Job = tuple[Juror, Item, Item]
+
+
 async def run_async_iter(
     description: str,
     jurors: List[Juror],
@@ -73,45 +76,72 @@ async def run_async_iter(
     """
     if pairs is None:
         sampler = pair_sampler or AllPairsSampler()
-        pairs = sampler.sample(items)
+        base_pairs = sampler.sample(items)
     else:
-        pairs = list(pairs)
+        base_pairs = list(pairs)
 
     rng = random.Random(pair_shuffle_seed)
-    pairs = _randomize_pair_orientations(pairs, rng)
+    oriented_pairs = _randomize_pair_orientations(base_pairs, rng)
+
+    jobs: list[Job] = [
+        (juror_config, item_a, item_b)
+        for item_a, item_b in oriented_pairs
+        for juror_config in jurors
+    ]
+
+    if not jobs:
+        return
+
+    worker_count = max(1, min(concurrency, len(jobs)))
 
     with _configure_logging(verbose):
-        semaphore = asyncio.Semaphore(concurrency)
+        job_queue: asyncio.Queue[Job | None] = asyncio.Queue()
+        result_queue: asyncio.Queue[Comparison | BaseException] = asyncio.Queue()
 
-        async def compare_pair(
-            juror_config: Juror, item_a: Item, item_b: Item
-        ) -> Comparison:
-            async with semaphore:
-                logger.info(
-                    "Comparing %s vs %s with %s",
-                    item_a.id,
-                    item_b.id,
-                    juror_config.id,
-                )
-                comparison = await run_juror(juror_config, description, item_a, item_b)
-                logger.info("%s chose %s", juror_config.id, comparison.winner)
-                return comparison
+        for job in jobs:
+            job_queue.put_nowait(job)
+        for _ in range(worker_count):
+            job_queue.put_nowait(None)
 
-        tasks = [
-            asyncio.create_task(compare_pair(juror_config, item_a, item_b))
-            for item_a, item_b in pairs
-            for juror_config in jurors
-        ]
+        async def worker() -> None:
+            while True:
+                job = await job_queue.get()
+                if job is None:
+                    return
+
+                juror_config, item_a, item_b = job
+                try:
+                    logger.info(
+                        "Comparing %s vs %s with %s",
+                        item_a.id,
+                        item_b.id,
+                        juror_config.id,
+                    )
+                    comparison = await run_juror(
+                        juror_config, description, item_a, item_b
+                    )
+                    logger.info("%s chose %s", juror_config.id, comparison.winner)
+                    await result_queue.put(comparison)
+                except Exception as exc:  # pragma: no cover - passthrough
+                    await result_queue.put(exc)
+                    return
+
+        workers = [asyncio.create_task(worker()) for _ in range(worker_count)]
 
         try:
-            for future in asyncio.as_completed(tasks):
-                yield await future
+            remaining = len(jobs)
+            while remaining:
+                message = await result_queue.get()
+                if isinstance(message, BaseException):
+                    raise message
+                remaining -= 1
+                yield message
         finally:
-            for task in tasks:
-                if not task.done():
-                    task.cancel()
-                    with suppress(asyncio.CancelledError):
-                        await task
+            for worker_task in workers:
+                if not worker_task.done():
+                    worker_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await worker_task
 
 
 async def run_async(
@@ -147,9 +177,7 @@ def run(
     pair_sampler: PairSampler | None = None,
     pair_shuffle_seed: int | None = None,
 ) -> List[Comparison]:
-    """
-    Synchronous wrapper for run_async.
-    """
+    """Synchronous wrapper for run_async."""
     return asyncio.run(
         run_async(
             description,
