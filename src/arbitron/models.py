@@ -4,12 +4,12 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, model_validator
 
 
-class Item(BaseModel):
+class Item(PydanticBaseModel):
     id: str
-    payload: Mapping[str, Any] | BaseModel | None = None
+    payload: Mapping[str, Any] | PydanticBaseModel | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -22,7 +22,9 @@ class Item(BaseModel):
         return data
 
     @staticmethod
-    def _serialise_payload(payload: BaseModel | Mapping[str, Any]) -> dict[str, Any]:
+    def _serialise_payload(
+        payload: PydanticBaseModel | Mapping[str, Any],
+    ) -> dict[str, Any]:
         converted = Item._convert(payload)
         if isinstance(converted, Mapping):
             return {str(key): value for key, value in converted.items()}
@@ -32,7 +34,7 @@ class Item(BaseModel):
 
     @staticmethod
     def _convert(value: Any) -> Any:
-        if isinstance(value, BaseModel):
+        if isinstance(value, PydanticBaseModel):
             return value.model_dump(mode="json")
 
         if isinstance(value, Mapping):
@@ -46,7 +48,7 @@ class Item(BaseModel):
         return value
 
 
-class Juror(BaseModel):
+class Juror(PydanticBaseModel):
     id: str
     instructions: str | None = None
     model: str | None = None
@@ -67,7 +69,7 @@ class ComparisonChoice(str, Enum):
     item_b = "item_b"
 
 
-class Comparison(BaseModel):
+class Comparison(PydanticBaseModel):
     juror_id: str
     item_a: str
     item_b: str
