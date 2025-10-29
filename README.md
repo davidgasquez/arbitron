@@ -1,16 +1,18 @@
 # Arbitron ⚖️
 
-Arbitron is an agentic _pairwise_ comparison engine. Multiple jurors, each with unique value systems, evaluate items head-to-head and produce a set of pairwise comparisons that can be used to [derive item's ranks and weights](https://choix.lum.li/en/latest/api.html#processing-pairwise-comparisons).
+Arbitron is an _agentic pairwise comparison engine_ that estimates the latent "utilities" of a set of items. Useful when you need consensus ranking (or relative weights) over multiple items where objective measures are hard. Multiple jurors, each with unique value systems, evaluate items head-to-head and produce a set of pairwise comparisons that can be used to derive item's ranks and weights.
+
+### ❓ FAQ
 
 - **Why pairwise?** It's easier to compare two items than to assign absolute scores.
 - **Why multi-juror?** Different models with different perspectives (instructions) lead to more balanced, less biased outcomes.
 
 ## ✨ Features
 
-- 🎯 **Arbitrary Sets**. Evaluate text, code, products, ideas
-- 🤖 **Customizable Jurors**. Specify custom instructions, tools, providers
-- 🛡️ **Bias Reduction**. Ensemble decision-making
-- 🧩 **Remixable** — Join data with human labels and apply personalized heuristics
+- 🎯 **Compare Arbitrary Sets of Items**. Text, code, products, ideas, papers, names
+- 🤖 **Customizable Jurors**. Specify custom instructions, tools, skills, and providers
+- 🛡️ **Bias Resistant**. Ensemble decision-making across diverse instructions, temperature, and model providers
+- 🧩 **Remixable**. Join data with human labels or apply personalized heuristics to derive meaningful ranks and weights
 
 ## 🚀 Quickstart
 
@@ -18,6 +20,9 @@ Running your first Arbitron "contest" is easy!
 
 ```bash
 pip install arbitron
+
+# Alternatively, with `uv`
+uv add arbitron
 ```
 
 Setup your favorite LLM provider's API keys in the environment (e.g: `OPENAI_API_KEY`) and then run the following code.
@@ -46,19 +51,6 @@ for comparison in competition.run():
     print(comparison)
 
 print(f"Total cost: {competition.cost}")
-```
-
-To stream results as soon as they are ready, consume the async generator returned by `competition.stream()`:
-
-```python
-import asyncio
-
-async def main() -> None:
-    # reuse the competition instance defined above
-    async for comparison in competition.stream():
-        print(comparison)
-
-asyncio.run(main())
 ```
 
 ## 🏛️ License
