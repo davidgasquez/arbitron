@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from arbitron import Competition, Item, Juror
 
 
+# Custom Pydantic model
 class Movie(BaseModel):
     title: str
     year: int
@@ -12,10 +13,12 @@ class Movie(BaseModel):
 items = [
     Item(
         id="arrival",
+        # Using a Pydantic model as payload
         payload=Movie(title="Arrival", year=2016, composer="Johann Johannsson"),
     ),
     Item(
         id="interstellar",
+        # Using a Python dict as payload
         payload={"title": "Interstellar", "year": 2014, "composer": "Hans Zimmer"},
     ),
     Item(
@@ -48,7 +51,9 @@ competition = Competition(
 print(f"Total pairs: {competition.total_pairs}")
 print(f"Total comparisons: {competition.total_comparisons}")
 
-for comparison in competition.run():
+results = competition.run()
+
+for comparison in results:
     print(comparison)
 
 print(f"Total cost: {competition.cost}")

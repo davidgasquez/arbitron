@@ -48,6 +48,19 @@ for comparison in competition.run():
 print(f"Total cost: {competition.cost}")
 ```
 
+To stream results as soon as they are ready, consume the async generator returned by `competition.stream()`:
+
+```python
+import asyncio
+
+async def main() -> None:
+    # reuse the competition instance defined above
+    async for comparison in competition.stream():
+        print(comparison)
+
+asyncio.run(main())
+```
+
 ## 🏛️ License
 
 MIT License - see [LICENSE](LICENSE) file for details.
