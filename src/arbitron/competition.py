@@ -1,10 +1,9 @@
 import asyncio
 import csv
+import sys
 from decimal import Decimal
 from pathlib import Path
-from queue import SimpleQueue
-from threading import Thread
-from typing import Iterator, List
+from typing import AsyncIterator, List
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
@@ -21,10 +20,9 @@ class Competition(BaseModel):
     jurors: List[Juror]
     items: List[Item]
     concurrency: int = 4
-    verbose: bool = False
     comparisons: List[Comparison] | None = None
     pair_sampler: PairSampler = Field(default_factory=AllPairsSampler)
-    pair_shuffle_seed: int | None = None
+    seed: int | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     _pairs: List[Pair] | None = PrivateAttr(default=None)
@@ -32,7 +30,7 @@ class Competition(BaseModel):
 
     def _ensure_pairs(self) -> List[Pair]:
         if self._pairs is None:
-            self._pairs = self.pair_sampler.sample(self.items)
+            self._pairs = self.pair_sampler.sample(self.items, seed=self.seed)
         return self._pairs
 
     @property
@@ -55,63 +53,67 @@ class Competition(BaseModel):
         """Return the accumulated model cost for this competition."""
         return self._total_cost
 
-    def run(self) -> Iterator[Comparison]:
-        """Stream comparison results as they are produced."""
+    async def stream(self, progress: bool = False) -> AsyncIterator[Comparison]:
+        """Asynchronously stream comparison results as they complete."""
         self._total_cost = Decimal("0")
         pairs = self._ensure_pairs()
-        queue: SimpleQueue[Comparison | BaseException | None] = SimpleQueue()
-        worker = self._launch_worker(queue, pairs)
-
         comparisons: list[Comparison] = []
+        total = self.total_comparisons
+        completed = 0
+        final_emitted = False
+
+        def _percentage(count: int) -> float:
+            if total == 0:
+                return 100.0
+            return (count / total) * 100
+
+        def _emit_progress(count: int, final: bool = False) -> None:
+            nonlocal final_emitted
+            if not progress:
+                return
+            percentage = _percentage(count)
+            suffix = "\n" if final else "\r"
+            print(
+                (
+                    f"Competition {self.id}: "
+                    f"{count}/{total} comparisons ({percentage:6.2f}%)"
+                ),
+                end=suffix,
+                file=sys.stderr,
+                flush=True,
+            )
+            if final:
+                final_emitted = True
 
         try:
-            while True:
-                message = queue.get()
-                if message is None:
-                    break
-                if isinstance(message, BaseException):
-                    raise message
-
-                comparison = message
+            async for comparison in run_async_iter(
+                description=self.description,
+                jurors=self.jurors,
+                items=self.items,
+                concurrency=self.concurrency,
+                pair_sampler=self.pair_sampler,
+                pairs=pairs,
+                seed=self.seed,
+            ):
                 comparisons.append(comparison)
                 if comparison.cost is not None:
                     self._total_cost += comparison.cost
+                completed += 1
+                is_last = completed == total
+                _emit_progress(completed, final=is_last)
                 yield comparison
         finally:
-            worker.join()
+            if progress and not final_emitted:
+                _emit_progress(completed, final=True)
             self.comparisons = comparisons
 
-    def _launch_worker(
-        self,
-        queue: SimpleQueue[Comparison | BaseException | None],
-        pairs: List[Pair],
-    ) -> Thread:
-        """Spin up the background worker that bridges async execution."""
+    def run(self, progress: bool = False) -> List[Comparison]:
+        """Collect all comparison results synchronously."""
 
-        def _produce() -> None:
-            async def _consume() -> None:
-                try:
-                    async for comparison in run_async_iter(
-                        description=self.description,
-                        jurors=self.jurors,
-                        items=self.items,
-                        concurrency=self.concurrency,
-                        verbose=self.verbose,
-                        pair_sampler=self.pair_sampler,
-                        pairs=pairs,
-                        pair_shuffle_seed=self.pair_shuffle_seed,
-                    ):
-                        queue.put(comparison)
-                except Exception as exc:  # pragma: no cover - passthrough
-                    queue.put(exc)
-                finally:
-                    queue.put(None)
+        async def _collect() -> List[Comparison]:
+            return [comparison async for comparison in self.stream(progress=progress)]
 
-            asyncio.run(_consume())
-
-        worker = Thread(target=_produce, daemon=True)
-        worker.start()
-        return worker
+        return asyncio.run(_collect())
 
     def to_csv(self, path: str | Path) -> None:
         """Persist comparison results to a CSV file."""

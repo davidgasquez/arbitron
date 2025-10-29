@@ -12,7 +12,7 @@ class PairSampler(ABC):
     """Interface for generating item pairings."""
 
     @abstractmethod
-    def sample(self, items: Sequence[Item]) -> list[Pair]:
+    def sample(self, items: Sequence[Item], seed: int | None = None) -> list[Pair]:
         """Return the list of item pairs to evaluate."""
 
 
@@ -22,9 +22,9 @@ class AllPairsSampler(PairSampler):
     def __init__(self, seed: int | None = None) -> None:
         self._seed = seed
 
-    def sample(self, items: Sequence[Item]) -> list[Pair]:
+    def sample(self, items: Sequence[Item], seed: int | None = None) -> list[Pair]:
         pairs = list(itertools.combinations(items, 2))
-        rng = random.Random(self._seed)
+        rng = random.Random(self._seed if seed is None else seed)
         rng.shuffle(pairs)
         return pairs
 
@@ -38,9 +38,9 @@ class RandomPairsSampler(PairSampler):
         self._count = count
         self._seed = seed
 
-    def sample(self, items: Sequence[Item]) -> list[Pair]:
+    def sample(self, items: Sequence[Item], seed: int | None = None) -> list[Pair]:
         pairs = list(itertools.combinations(items, 2))
-        rng = random.Random(self._seed)
+        rng = random.Random(self._seed if seed is None else seed)
         if self._count >= len(pairs):
             rng.shuffle(pairs)
             return pairs

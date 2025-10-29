@@ -1,3 +1,4 @@
+import asyncio
 import itertools
 import random
 from datetime import datetime, timezone
@@ -10,7 +11,7 @@ from pydantic_ai.models.test import TestModel
 from arbitron import Competition, Item, Juror
 from arbitron.juror import _build_user_prompt, _format_item_block, _resolve_agent
 from arbitron.models import Comparison, ComparisonChoice
-from arbitron.pairing import RandomPairsSampler
+from arbitron.pairing import AllPairsSampler, RandomPairsSampler
 from arbitron.runner import _randomize_pair_orientations
 
 
@@ -51,6 +52,79 @@ def test_competition_runs_with_test_model():
     assert winners <= expected_ids
     assert all(comparison.created_at for comparison in comparisons)
     assert competition.comparisons == comparisons
+
+
+def test_stream_async_iteration_collects_results():
+    competition = Competition(
+        id="async-stream",
+        description="Asynchronous stream collects results",
+        jurors=[_build_test_juror()],
+        items=[
+            Item(id="arrival"),
+            Item(id="interstellar"),
+            Item(id="inception"),
+        ],
+    )
+
+    streamed: list[Comparison] = []
+
+    async def _consume() -> None:
+        async for comparison in competition.stream():
+            streamed.append(comparison)
+
+    asyncio.run(_consume())
+
+    assert len(streamed) == competition.total_comparisons
+    assert streamed == competition.comparisons
+
+
+def test_stream_reports_progress(capfd: pytest.CaptureFixture[str]):
+    competition = Competition(
+        id="progress-stream",
+        description="Progress reporting",
+        jurors=[_build_test_juror()],
+        items=[
+            Item(id="A"),
+            Item(id="B"),
+            Item(id="C"),
+        ],
+    )
+
+    async def _consume() -> None:
+        async for _ in competition.stream(progress=True):
+            pass
+
+    asyncio.run(_consume())
+    _, err = capfd.readouterr()
+    progress_updates = [line for line in err.split("\r") if line]
+    assert progress_updates, "Expected progress output on stderr."
+
+    total = competition.total_comparisons
+    expected_final = (
+        f"Competition {competition.id}: {total}/{total} comparisons (100.00%)"
+    )
+    assert progress_updates[-1].strip() == expected_final
+
+
+def test_stream_silent_without_progress(capfd: pytest.CaptureFixture[str]):
+    competition = Competition(
+        id="silent-stream",
+        description="No progress output by default",
+        jurors=[_build_test_juror()],
+        items=[
+            Item(id="A"),
+            Item(id="B"),
+        ],
+    )
+
+    async def _consume() -> None:
+        async for _ in competition.stream():
+            pass
+
+    asyncio.run(_consume())
+    stdout, stderr = capfd.readouterr()
+    assert stdout == ""
+    assert stderr == ""
 
 
 def test_item_payload_serialises_custom_data():
@@ -112,6 +186,21 @@ def test_total_pairs_and_comparisons_are_exposed():
         ("2", "4"),
         ("3", "4"),
     }
+
+
+def test_competition_seed_controls_pair_order():
+    items = [Item(id=str(value)) for value in range(4)]
+    competition = Competition(
+        id="seeded-order",
+        description="Check pair order",
+        jurors=[_build_test_juror()],
+        items=items,
+        seed=7,
+    )
+
+    sampler = AllPairsSampler(seed=7)
+    expected = sampler.sample(items)
+    assert competition.pairs == expected
 
 
 def test_random_sampler_pairs_are_cached_and_reused():
@@ -192,7 +281,7 @@ def test_pair_orientation_randomization_uses_seed():
     ]
 
 
-def test_competition_pair_shuffle_seed_reproducible(monkeypatch: pytest.MonkeyPatch):
+def test_competition_seed_reproducible(monkeypatch: pytest.MonkeyPatch):
     items = [
         Item(id="A"),
         Item(id="B"),
@@ -226,7 +315,7 @@ def test_competition_pair_shuffle_seed_reproducible(monkeypatch: pytest.MonkeyPa
         description="Pick a letter",
         jurors=[juror],
         items=items,
-        pair_shuffle_seed=123,
+        seed=123,
     )
 
     first_winners = list(competition.run())
@@ -236,6 +325,17 @@ def test_competition_pair_shuffle_seed_reproducible(monkeypatch: pytest.MonkeyPa
     second_winners = list(competition.run())
     second_orientations = orientations.copy()
 
+    orientation_seed = competition.seed + 1 if competition.seed is not None else None
+    expected_rng = random.Random(orientation_seed)
+    expected_orientations = [
+        (pair[1].id, pair[0].id)
+        if expected_rng.randrange(2)
+        else (pair[0].id, pair[1].id)
+        for pair in competition.pairs
+    ]
+
+    assert first_orientations == expected_orientations
+    assert second_orientations == expected_orientations
     assert sorted(first_orientations) == sorted(second_orientations)
     assert sorted(
         (comp.item_a, comp.item_b, comp.winner) for comp in first_winners
