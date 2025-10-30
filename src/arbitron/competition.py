@@ -24,7 +24,7 @@ class Competition(BaseModel):
     pair_sampler: PairSampler = Field(default_factory=AllPairsSampler)
     seed: int | None = None
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
     _pairs: List[Pair] | None = PrivateAttr(default=None)
     _total_cost: Decimal = PrivateAttr(default_factory=lambda: Decimal("0"))
 
@@ -56,6 +56,9 @@ class Competition(BaseModel):
     async def stream(self, progress: bool = False) -> AsyncIterator[Comparison]:
         """Asynchronously stream comparison results as they complete."""
         self._total_cost = Decimal("0")
+        if self.comparisons is not None:
+            self.comparisons = None
+            self._pairs = None
         pairs = self._ensure_pairs()
         comparisons: list[Comparison] = []
         total = self.total_comparisons

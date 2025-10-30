@@ -1,3 +1,7 @@
+import math
+from typing import Any
+
+from choix import ilsr_pairwise
 from pydantic import BaseModel
 
 from arbitron import Competition, Item, Juror
@@ -40,6 +44,18 @@ jurors = [
     ),
 ]
 
+
+def item_label(item: Item) -> str:
+    payload: Any = item.payload
+    if isinstance(payload, BaseModel):
+        maybe_title = getattr(payload, "title", None)
+    elif isinstance(payload, dict):
+        maybe_title = payload.get("title")
+    else:
+        maybe_title = None
+    return maybe_title if isinstance(maybe_title, str) else item.id
+
+
 competition = Competition(
     id="sci-fi-soundtracks",
     description="Which movie has the better soundtrack?",
@@ -55,5 +71,31 @@ results = competition.run()
 
 for comparison in results:
     print(comparison)
+
+item_index = {item.id: index for index, item in enumerate(items)}
+pairwise_data = [
+    (
+        item_index[comparison.winner],
+        item_index[
+            comparison.item_b
+            if comparison.winner == comparison.item_a
+            else comparison.item_a
+        ],
+    )
+    for comparison in results
+]
+
+params = ilsr_pairwise(len(items), pairwise_data, alpha=1.0)
+weights = [math.exp(float(param)) for param in params]
+total = sum(weights)
+ranking = sorted(
+    ((item, weight / total) for item, weight in zip(items, weights, strict=True)),
+    key=lambda pair: pair[1],
+    reverse=True,
+)
+
+print("\nRanking:")
+for position, (item, weight) in enumerate(ranking, start=1):
+    print(f"{position}. {item_label(item)} — {weight:.2%}")
 
 print(f"Total cost: {competition.cost}")
