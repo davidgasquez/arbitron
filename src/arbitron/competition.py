@@ -131,6 +131,7 @@ class Competition(BaseModel):
             "item_a",
             "item_b",
             "winner",
+            "comparison_confidence",
             "comparison_created_at",
             "comparison_cost",
         ]
@@ -145,6 +146,7 @@ class Competition(BaseModel):
                     "item_a": comparison.item_a,
                     "item_b": comparison.item_b,
                     "winner": comparison.winner,
+                    "comparison_confidence": f"{comparison.confidence:.4f}",
                     "comparison_created_at": comparison.created_at.isoformat(),
                     "comparison_cost": (
                         str(comparison.cost) if comparison.cost is not None else ""

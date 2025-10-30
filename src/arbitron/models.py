@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel as PydanticBaseModel, ConfigDict, model_validator
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field, model_validator
 
 
 class Item(PydanticBaseModel):
@@ -69,10 +69,16 @@ class ComparisonChoice(str, Enum):
     item_b = "item_b"
 
 
+class ComparisonVerdict(PydanticBaseModel):
+    choice: ComparisonChoice
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
 class Comparison(PydanticBaseModel):
     juror_id: str
     item_a: str
     item_b: str
     winner: str
+    confidence: float = Field(ge=0.0, le=1.0)
     created_at: datetime
     cost: Decimal | None = None

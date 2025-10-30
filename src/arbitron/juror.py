@@ -7,7 +7,7 @@ from typing import Any
 from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai.messages import ModelResponse
 
-from .models import Comparison, ComparisonChoice, Item, Juror
+from .models import Comparison, ComparisonChoice, ComparisonVerdict, Item, Juror
 
 
 def _default_instructions(juror: Juror) -> str:
@@ -22,7 +22,9 @@ You are an expert juror.
 
 ## Output
 
-Return `choice` as either "item_a" or "item_b".""".strip()
+Return your output as JSON with two keys:
+- `choice`: either "item_a" or "item_b"
+- `confidence`: a number between 0 and 1""".strip()
 
 
 def _value_to_xml(tag: str, value: Any) -> str:
@@ -70,7 +72,7 @@ def _build_user_prompt(description: str, item_a: Item, item_b: Item) -> str:
 
 <instruction>
 Compare the two items above and determine which one better fulfills the task requirements.
-Return your choice as either "item_a" or "item_b".
+Return your choice as either "item_a" or "item_b" and provide a confidence score between 0 and 1.
 </instruction>"""
 
 
@@ -78,10 +80,10 @@ def _resolve_agent(juror: Juror, instructions: str) -> PydanticAgent:
     """Return a Juror-ready Agent, using defaults when needed."""
     agent = juror.agent
     if agent is None:
-        agent = PydanticAgent[None, ComparisonChoice](
+        agent = PydanticAgent[None, ComparisonVerdict](
             model=juror.model or "openai:gpt-5-nano",
             instructions=instructions,
-            output_type=ComparisonChoice,
+            output_type=ComparisonVerdict,
             retries=3,
         )
     if isinstance(agent, PydanticAgent):
@@ -125,10 +127,11 @@ async def run_juror(
     agent = _resolve_agent(juror, instructions)
 
     result = await agent.run(user_prompt)
-    try:
-        choice: ComparisonChoice = ComparisonChoice(result.output)
-    except ValueError as exc:  # pragma: no cover - defensive
-        raise TypeError("Juror output must be 'item_a' or 'item_b'") from exc
+    verdict = result.output
+    if not isinstance(verdict, ComparisonVerdict):  # pragma: no cover - defensive
+        raise TypeError("Juror output must include choice and confidence")
+
+    choice = verdict.choice
 
     winner = item_a.id if choice is ComparisonChoice.item_a else item_b.id
 
@@ -140,6 +143,7 @@ async def run_juror(
         item_a=item_a.id,
         item_b=item_b.id,
         winner=winner,
+        confidence=verdict.confidence,
         created_at=datetime.now(timezone.utc),
         cost=comparison_cost,
     )
