@@ -1,6 +1,7 @@
 import asyncio
 import itertools
 import random
+from collections.abc import Sequence
 from datetime import datetime, timezone
 
 import pytest
@@ -11,7 +12,7 @@ from pydantic_ai.models.test import TestModel
 from arbitron import Competition, Item, Juror
 from arbitron.juror import _build_user_prompt, _format_item_block, _resolve_agent
 from arbitron.models import Comparison, ComparisonChoice
-from arbitron.pairing import AllPairsSampler, RandomPairsSampler
+from arbitron.pairing import AllPairsSampler, PairSampler, RandomPairsSampler
 from arbitron.runner import _randomize_pair_orientations
 
 
@@ -256,6 +257,40 @@ def test_random_sampler_shuffles_when_requesting_all_pairs():
     assert {(item_a.id, item_b.id) for item_a, item_b in shuffled_pairs} == {
         (item_a.id, item_b.id) for item_a, item_b in all_pairs
     }
+
+
+def test_competition_resamples_pairs_between_runs():
+    class CountingSampler(PairSampler):
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def sample(
+            self,
+            items: Sequence[Item],
+            seed: int | None = None,
+        ) -> list[tuple[Item, Item]]:
+            self.calls += 1
+            return list(itertools.combinations(items, 2))
+
+    items = [
+        Item(id="A"),
+        Item(id="B"),
+        Item(id="C"),
+    ]
+    sampler = CountingSampler()
+    competition = Competition(
+        id="resample-pairs",
+        description="Ensure pairs refresh each run",
+        jurors=[_build_test_juror("alpha")],
+        items=items,
+        pair_sampler=sampler,
+    )
+
+    list(competition.run())
+    assert sampler.calls == 1
+
+    list(competition.run())
+    assert sampler.calls == 2
 
 
 def test_pair_orientation_randomization_uses_seed():
