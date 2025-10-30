@@ -11,7 +11,7 @@ from pydantic_ai.models.test import TestModel
 
 from arbitron import Competition, Item, Juror
 from arbitron.juror import _build_user_prompt, _format_item_block, _resolve_agent
-from arbitron.models import Comparison, ComparisonChoice
+from arbitron.models import Comparison, ComparisonChoice, ComparisonVerdict
 from arbitron.pairing import AllPairsSampler, PairSampler, RandomPairsSampler
 from arbitron.runner import _randomize_pair_orientations
 
@@ -26,7 +26,7 @@ def _build_test_juror(juror_id: str = "unit-test") -> Juror:
     agent = Agent(
         model=TestModel(),
         instructions="Fake juror used for unit tests.",
-        output_type=ComparisonChoice,
+        output_type=ComparisonVerdict,
     )
     return Juror(id=juror_id, agent=agent)
 
@@ -337,6 +337,7 @@ def test_competition_seed_reproducible(monkeypatch: pytest.MonkeyPatch):
             item_a=item_a.id,
             item_b=item_b.id,
             winner=item_a.id,
+            confidence=0.75,
             created_at=datetime.now(timezone.utc),
             cost=None,
         )
@@ -421,7 +422,7 @@ def test_juror_rejects_agent_and_model():
     agent = Agent(
         model=TestModel(),
         instructions="Fake juror used for unit tests.",
-        output_type=ComparisonChoice,
+        output_type=ComparisonVerdict,
     )
 
     with pytest.raises(ValueError, match="either `agent` or `model`"):
